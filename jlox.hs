@@ -67,10 +67,10 @@ data TokenType
   deriving (Show)
 
 data Object
-  = ONUMBER Double
-  | OSTRING String
-  | OBOOL Bool
-  | ONIL
+  = OBJ_NUMBER Double
+  | OBJ_STRING String
+  | OBJ_BOOL   Bool
+  | OBJ_NIL
   deriving (Show)
 
 data Token = Token
@@ -146,10 +146,12 @@ initLoc :: Loc
 initLoc = Loc { l_start = 0, l_current = 0, l_line = 1 }
 
 createLoc :: Int -> Int -> Int -> Loc
-createLoc l_start l_current l_line = Loc { l_start, l_current, l_line }
+createLoc l_start l_current l_line =
+  Loc { l_start, l_current, l_line }
 
 createTsl :: Token -> Scanner -> Loc -> Tsl
-createTsl tsl_token tsl_scanner tsl_loc = Tsl { tsl_token, tsl_scanner, tsl_loc }
+createTsl tsl_token tsl_scanner tsl_loc =
+  Tsl { tsl_token, tsl_scanner, tsl_loc }
 
 -- scanner core
 
@@ -166,7 +168,7 @@ advance loc scanner =
 -- addToken variants (like Java: addToken(type) and addToken(type, literal))
 
 addToken :: TokenType -> Loc -> Scanner -> Scanner
-addToken t_type = addTokenWithLiteral t_type ONIL
+addToken t_type = addTokenWithLiteral t_type OBJ_NIL
 
 addTokenWithLiteral :: TokenType -> Object -> Loc -> Scanner -> Scanner
 addTokenWithLiteral t_type literal loc scanner =
@@ -198,32 +200,48 @@ scanToken loc scanner =
 scanTokens :: Loc -> Scanner -> Tsl
 scanTokens loc scanner
   | isAtEnd (l_current loc) (s_source scanner) =
-      let eofTok = createToken EOF "" ONIL (l_line loc)
+      let eofTok = createToken EOF "" OBJ_NIL (l_line loc)
       in createTsl eofTok scanner loc
 
   | otherwise =
-      let loc'            = loc { l_start = l_current loc }
-          (loc'', sc')    = scanToken loc' scanner
+      let loc'          = loc { l_start = l_current loc }
+          (loc'', sc')  = scanToken loc' scanner
       in scanTokens loc'' sc'
 
 reverseTokensFromScanner :: Scanner -> Scanner
-reverseTokensFromScanner scanner = scanner {s_tokens = reverse $ s_tokens scanner} 
+reverseTokensFromScanner scanner =
+  scanner {s_tokens = reverse $ s_tokens scanner}
 
 reverseTokensFromTsl :: Tsl -> Tsl
-reverseTokensFromTsl tsl = tsl {tsl_scanner = reverseTokensFromScanner $ tsl_scanner tsl} 
+reverseTokensFromTsl tsl =
+  tsl {tsl_scanner = reverseTokensFromScanner $ tsl_scanner tsl}
+
+prettyPrintToken :: Token -> IO ()
+prettyPrintToken token = do
+  putStrLn "Token: "
+  putStrLn $ "  type    = " ++ show (t_type token)
+  putStrLn $ "  lexeme  = " ++ show (t_lexeme token)
+  putStrLn $ "  literal = " ++ show (t_literal token)
+  putStrLn $ "  line    = " ++ show (t_line token)
+  -- putStrLn ""
+
+prettyPrintScanner :: Scanner -> IO ()
+prettyPrintScanner scanner = do
+  putStrLn $ "Source: " ++ s_source scanner
+  mapM_ prettyPrintToken (s_tokens scanner)
 
 -- main
 
 main :: IO ()
 main = do
+  let loc = initLoc
   args <- getArgs
   case args of
     [] -> runPrompt
     [p] -> do
       result <- runFile p
-      let loc = initLoc
       let scanner = createScanner result []
       let tsl = reverseTokensFromTsl $ scanTokens loc scanner
-      print $ tsl_scanner tsl
+      prettyPrintScanner $ tsl_scanner tsl
 
     _ -> error "Too many args. Can only take one arg"
