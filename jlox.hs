@@ -172,9 +172,8 @@ addToken t_type = addTokenWithLiteral t_type L_NIL
 
 addTokenWithLiteral :: TokenType -> Literal -> Loc -> Scanner -> Scanner
 addTokenWithLiteral t_type literal loc scanner =
-  -- let distance = l_current loc - l_start loc
-  let text = sliceBs (l_start loc) (l_current loc) (s_source scanner)
-      token    = createToken t_type text literal (l_line loc)
+  let text  = sliceBs (l_start loc) (l_current loc) (s_source scanner)
+      token = createToken t_type text literal (l_line loc)
   in scanner { s_tokens = token : s_tokens scanner }
 
 match :: Loc -> Scanner -> Char -> (Loc, Bool)
@@ -200,6 +199,7 @@ scanToken loc scanner =
         '+' -> (loc1, addToken PLUS        loc1 scanner)
         ';' -> (loc1, addToken SEMICOLON   loc1 scanner)
         '*' -> (loc1, addToken STAR        loc1 scanner)
+        '\n' -> (loc1 { l_line = l_line loc1 + 1 }, scanner)
 
         -- single or double characters
         '!' ->
@@ -215,9 +215,6 @@ scanToken loc scanner =
           let (m_loc, expected) = match loc1 scanner '='
           in (m_loc, addToken (if expected then GREATER_EQUAL else GREATER) m_loc scanner)
 
-        -- new line
-        '\n' ->
-          (loc1 { l_line = l_line loc1 + 1 }, scanner)
 
         -- default value
         u_val ->
@@ -286,8 +283,22 @@ prettyPrintLoc loc = do
   putStrLn $ "  current = " ++ show (l_current loc)
   putStrLn $ "  line    = " ++ show (l_line loc)
 
-prettyPrintScanner :: Scanner -> IO ()
-prettyPrintScanner scanner = do
+
+data PpScanOp = ShowTokensOnly | ShowSource | ShowErrors | ShowSourceErrors
+
+prettyPrintScanner :: Scanner -> PpScanOp -> IO ()
+prettyPrintScanner scanner ShowTokensOnly = do
+  mapM_ prettyPrintToken (s_tokens scanner)
+
+prettyPrintScanner scanner ShowErrors = do
+  mapM_ prettyPrintToken (s_tokens scanner)
+  mapM_ putStrLn (s_errors scanner)
+
+prettyPrintScanner scanner ShowSource = do
+  putStrLn $ "Source: " ++ show (s_source scanner)
+  mapM_ prettyPrintToken (s_tokens scanner)
+
+prettyPrintScanner scanner ShowSourceErrors = do
   putStrLn $ "Source: " ++ show (s_source scanner)
   mapM_ prettyPrintToken (s_tokens scanner)
   mapM_ putStrLn (s_errors scanner)
@@ -321,7 +332,7 @@ main = do
       result <- runFile p
       let scanner = initScanner result
       let tsl = reverseTokensErrorsFromTsl $ scanTokens loc scanner
-      prettyPrintScanner $ tsl_scanner tsl
+      prettyPrintScanner (tsl_scanner tsl) ShowSourceErrors
   
     _ -> error "Too many args. Can only take one arg"
 
