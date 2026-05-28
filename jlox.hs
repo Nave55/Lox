@@ -14,8 +14,8 @@ infixl 1 |>
 
 -- data --
 
-data Err = OK | ERR
-  deriving (Show)
+-- data Err = OK | ERR | UNTERMINATED_STRING
+--   deriving (Show)
 
 data TokenType
   = -- Single-character tokens
@@ -77,7 +77,7 @@ data Literal
 data Token = Token
   { t_type    :: TokenType
   , t_lexeme  :: BS.ByteString
-  , t_literal :: Literal
+  , t_literal :: Maybe Literal
   , t_line    :: Int
   }
   deriving (Show)
@@ -96,12 +96,25 @@ data Loc = Loc
   }
   deriving (Show)
 
-data Tsl = Tsl
-  { tsl_token   :: Token
-  , tsl_scanner :: Scanner
-  , tsl_loc     :: Loc
-  }
-  deriving (Show)
+-- data Tsl = Tsl
+--   { tsl_token   :: Token
+--   , tsl_scanner :: Scanner
+--   , tsl_loc     :: Loc
+--   }
+--   deriving (Show)
+
+-- data LocScan = LocScan
+--   { ls_loc     :: Loc
+--   , ls_scanner :: Scanner
+--   }
+--   deriving (Show)
+
+-- data Lse = Lse
+--   { loc     :: Loc
+--   , scanner :: Scanner
+--   , err     :: String
+--   }
+--   deriving (Show)
 
 -- string and error functions
 
@@ -116,7 +129,7 @@ tokenToString :: Token -> String
 tokenToString token =
   show (t_type token) ++ " " ++ show (t_lexeme token) ++ " " ++ show (t_literal token)
 
-createToken :: TokenType -> BS.ByteString -> Literal -> Int -> Token
+createToken :: TokenType -> BS.ByteString -> Maybe Literal -> Int -> Token
 createToken t_type t_lexeme t_literal t_line =
   Token { t_type, t_lexeme, t_literal, t_line }
 
@@ -143,17 +156,18 @@ createLoc :: Int -> Int -> Int -> Loc
 createLoc l_start l_current l_line =
   Loc { l_start, l_current, l_line }
 
-createTsl :: Token -> Scanner -> Loc -> Tsl
-createTsl tsl_token tsl_scanner tsl_loc =
-  Tsl { tsl_token, tsl_scanner, tsl_loc }
-
 -- scanner core
 
 sliceBs :: Int -> Int -> BS.ByteString -> BS.ByteString
 sliceBs i j bs = BS.take (j - i) (BS.drop i bs)
 
 sliceStartCurrent :: Loc -> Scanner -> BS.ByteString
-sliceStartCurrent loc scanner = sliceBs (l_start loc) (l_current loc) (s_source scanner)
+sliceStartCurrent loc scanner =
+  sliceBs (l_start loc) (l_current loc) (s_source scanner)
+
+sliceStartCurrentOff :: Loc -> Scanner -> Int -> Int -> BS.ByteString
+sliceStartCurrentOff loc scanner s_off c_off =
+  sliceBs (l_start loc + s_off) (l_current loc + c_off) (s_source scanner)
 
 sourceLen :: Scanner -> Int
 sourceLen scanner = BS.length $ s_source scanner
@@ -174,9 +188,9 @@ advance loc scanner =
 -- addToken variants (like Java: addToken(type) and addToken(type, literal))
 
 addToken :: TokenType -> Loc -> Scanner -> Scanner
-addToken t_type = addTokenWithLiteral t_type L_NIL
+addToken t_type = addTokenWithLiteral t_type Nothing
 
-addTokenWithLiteral :: TokenType -> Literal -> Loc -> Scanner -> Scanner
+addTokenWithLiteral :: TokenType -> Maybe Literal -> Loc -> Scanner -> Scanner
 addTokenWithLiteral t_type literal loc scanner =
   let text  = sliceStartCurrent loc scanner
       token = createToken t_type text literal (l_line loc)
@@ -193,13 +207,39 @@ peek loc scanner
   | isAtEnd loc scanner = '\0'
   | otherwise = charAtCur loc scanner
 
-peekAdvance :: Loc -> Scanner -> Loc
-peekAdvance loc scanner
-  | peek loc scanner /= '\n' && not (isAtEnd loc scanner) =
-    let (loc1, _) = advance loc scanner
-    in peekAdvance loc1 scanner
-  | otherwise = loc
+parseSlash :: Loc -> Scanner -> Bool -> (Loc, Scanner)
+parseSlash loc scanner matched
+  | matched =
+      let c = peek loc scanner
+      in if c /= '\n' && not (isAtEnd loc scanner)
+           then
+             let (loc1, _) = advance loc scanner
+             in parseSlash loc1 scanner True
+           else
+             (loc, scanner)
+  | otherwise =
+      (loc, addToken SLASH loc scanner)
 
+parseString :: Loc -> Scanner -> (Loc, Scanner)
+parseString loc scanner
+  | peek loc scanner /= '"' && not (isAtEnd loc scanner) =
+      let loc1 = if peek loc scanner == '\n'
+          then loc {l_line = l_line loc + 1}
+          else loc
+
+          (loc2, _) = advance loc1 scanner
+      in parseString loc2 scanner
+
+  | isAtEnd loc scanner =
+      let err = createError (l_line loc) "Unterminated String."
+      in (loc, scanner { s_errors = err : s_errors scanner })
+
+  | otherwise =
+      let (loc1, _) = advance loc scanner
+          val = sliceStartCurrentOff loc1 scanner 1 (-1)
+      in (loc1, addTokenWithLiteral STRING (Just (L_STRING (BS.unpack val))) loc1 scanner)  
+    
+  
 -- scan a single token
 
 scanToken :: Loc -> Scanner -> (Loc, Scanner)
@@ -235,12 +275,13 @@ scanToken loc scanner =
         '>' ->
           let (loc2, matched) = match loc1 scanner '='
           in (loc2, addToken (if matched then GREATER_EQUAL else GREATER) loc2 scanner)
+
+        -- single or more character
         '/' ->
           let (loc2, matched) = match loc1 scanner '/'
-          in if matched
-              then (peekAdvance loc2 scanner, scanner)
-              else (loc2, addToken SLASH loc2 scanner)
-
+          in parseSlash loc2 scanner matched
+        '"' -> parseString loc1 scanner
+            
         -- default value
         u_val ->
           let err = createError (l_line loc1) ("Unexpected Character '" ++ [u_val] ++ "'")
@@ -248,16 +289,15 @@ scanToken loc scanner =
   in (loc2, scanner1)
 -- scan loop
 
-scanTokens :: Loc -> Scanner -> Tsl
+scanTokens :: Loc -> Scanner -> (Loc, Scanner)
 scanTokens loc scanner
   | isAtEnd loc scanner =
-      let eofTok = createToken EOF BS.empty L_NIL (l_line loc)
+      let eofTok = createToken EOF BS.empty Nothing (l_line loc)
           scanner1 = scanner { s_tokens = eofTok : s_tokens scanner }
-      in createTsl eofTok scanner1 loc
+      in (loc, scanner1)
 
   | otherwise =
       let loc1      = loc { l_start = l_current loc }
-          -- scanner1 = scanner { s_lex_start = s_source_rem scanner }
           (loc2, scanner2) = scanToken loc1 scanner
       in scanTokens loc2 scanner2
 
@@ -267,17 +307,9 @@ reverseTokensFromScanner :: Scanner -> Scanner
 reverseTokensFromScanner scanner =
   scanner { s_tokens = reverse $ s_tokens scanner }
 
-reverseTokensFromTsl :: Tsl -> Tsl
-reverseTokensFromTsl tsl =
-  tsl { tsl_scanner = reverseTokensFromScanner $ tsl_scanner tsl }
-
 reverseErrorsFromScanner :: Scanner -> Scanner
 reverseErrorsFromScanner scanner =
   scanner { s_errors = reverse $ s_errors scanner }
-
-reverseErrorsFromTsl :: Tsl -> Tsl
-reverseErrorsFromTsl tsl =
-  tsl { tsl_scanner = reverseErrorsFromScanner $ tsl_scanner tsl }
 
 reverseTokensErrorsFromScanner :: Scanner -> Scanner
 reverseTokensErrorsFromScanner scanner =
@@ -286,17 +318,13 @@ reverseTokensErrorsFromScanner scanner =
     , s_errors = reverse $ s_errors scanner
     }
 
-reverseTokensErrorsFromTsl :: Tsl -> Tsl
-reverseTokensErrorsFromTsl tsl =
-  tsl { tsl_scanner = reverseTokensErrorsFromScanner (tsl_scanner tsl) }
-
 -- pretty print functions
 
 prettyPrintToken :: Token -> IO ()
 prettyPrintToken token = do
   putStrLn "Token: "
   putStrLn $ "  type    = " ++ show (t_type token)
-  putStrLn $ "  lexeme  = " ++ show (t_lexeme token)
+  putStrLn $ "  lexeme  = " ++ BS.unpack (t_lexeme token)
   putStrLn $ "  literal = " ++ show (t_literal token)
   putStrLn $ "  line    = " ++ show (t_line token)
   -- putStrLn ""
@@ -333,12 +361,13 @@ prettyPrintScanner scanner ShowSourceErrors = do
 run :: Loc -> String -> PpScanOp -> IO ()
 run loc source op = do
   let scanner = initScanner source
-  let tsl = reverseTokensErrorsFromTsl $ scanTokens loc scanner
-  prettyPrintScanner (tsl_scanner tsl) op 
+  let (loc1, scanner1) = scanTokens loc scanner
+  let scanner2 = reverseTokensErrorsFromScanner scanner1
+  prettyPrintScanner scanner2 op 
   
 runFile :: Loc -> String -> IO ()
-runFile loc str = do
-  bytes <- readFile str
+runFile loc file_path = do
+  bytes <- readFile file_path
   run loc bytes ShowSourceErrors
 
 runPrompt :: Loc -> IO ()
@@ -356,6 +385,7 @@ main = do
   let loc = initLoc
   args <- getArgs
   case args of
-    [] -> runPrompt loc
+    []  -> runPrompt loc
     [p] -> runFile loc p
     _ -> error "Too many args. Can only take one arg"
+
