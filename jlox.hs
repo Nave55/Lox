@@ -152,15 +152,21 @@ createTsl tsl_token tsl_scanner tsl_loc =
 sliceBs :: Int -> Int -> BS.ByteString -> BS.ByteString
 sliceBs i j bs = BS.take (j - i) (BS.drop i bs)
 
+sliceStartCurrent :: Loc -> Scanner -> BS.ByteString
+sliceStartCurrent loc scanner = sliceBs (l_start loc) (l_current loc) (s_source scanner)
+
 sourceLen :: Scanner -> Int
 sourceLen scanner = BS.length $ s_source scanner
+
+charAtCur :: Loc -> Scanner -> Char
+charAtCur loc scanner = BS.index (s_source scanner) (l_current loc)
 
 isAtEnd :: Loc -> Scanner -> Bool
 isAtEnd loc scanner = l_current loc >= sourceLen scanner
 
 advance :: Loc -> Scanner -> (Loc, Char)
 advance loc scanner =
-  let c      = BS.index (s_source scanner) (l_current loc) 
+  let c      = charAtCur loc scanner
       n_curr = l_current loc + 1
       loc1   = loc { l_current = n_curr }
   in (loc1, c)
@@ -172,15 +178,27 @@ addToken t_type = addTokenWithLiteral t_type L_NIL
 
 addTokenWithLiteral :: TokenType -> Literal -> Loc -> Scanner -> Scanner
 addTokenWithLiteral t_type literal loc scanner =
-  let text  = sliceBs (l_start loc) (l_current loc) (s_source scanner)
+  let text  = sliceStartCurrent loc scanner
       token = createToken t_type text literal (l_line loc)
   in scanner { s_tokens = token : s_tokens scanner }
 
 match :: Loc -> Scanner -> Char -> (Loc, Bool)
-match loc scanner expected 
+match loc scanner expected
   | isAtEnd loc scanner = (loc, False)
-  | BS.index (s_source scanner) (l_current loc) /= expected = (loc, False)
+  | charAtCur loc scanner /= expected = (loc, False)
   | otherwise = (loc {l_current = l_current loc + 1}, True)
+
+peek :: Loc -> Scanner -> Char
+peek loc scanner
+  | isAtEnd loc scanner = '\0'
+  | otherwise = charAtCur loc scanner
+
+peekAdvance :: Loc -> Scanner -> Loc
+peekAdvance loc scanner
+  | peek loc scanner /= '\n' && not (isAtEnd loc scanner) =
+    let (loc1, _) = advance loc scanner
+    in peekAdvance loc1 scanner
+  | otherwise = loc
 
 -- scan a single token
 
@@ -199,22 +217,29 @@ scanToken loc scanner =
         '+' -> (loc1, addToken PLUS        loc1 scanner)
         ';' -> (loc1, addToken SEMICOLON   loc1 scanner)
         '*' -> (loc1, addToken STAR        loc1 scanner)
+        ' ' -> (loc1, scanner)
+        '\r' -> (loc1, scanner)
+        '\t' -> (loc1, scanner)
         '\n' -> (loc1 { l_line = l_line loc1 + 1 }, scanner)
+        '/' ->
+          let (loc2, matched) = match loc1 scanner '/'
+          in if matched
+              then (peekAdvance loc2 scanner, scanner)
+              else (loc2, addToken SLASH loc2 scanner)
 
         -- single or double characters
         '!' ->
-          let (m_loc, expected) = match loc1 scanner '='
-          in (m_loc, addToken (if expected then BANG_EQUAL else BANG) m_loc scanner)
+          let (loc2, matched) = match loc1 scanner '='
+          in (loc2, addToken (if matched then BANG_EQUAL else BANG) loc2 scanner)
         '=' ->
-          let (m_loc, expected) = match loc1 scanner '='
-          in (m_loc, addToken (if expected then EQUAL_EQUAL else EQUAL) m_loc scanner)
+          let (loc2, matched) = match loc1 scanner '='
+          in (loc2, addToken (if matched then EQUAL_EQUAL else EQUAL) loc2 scanner)
         '<' ->
-          let (m_loc, expected) = match loc1 scanner '='
-          in (m_loc, addToken (if expected then LESS_EQUAL else LESS) m_loc scanner)
+          let (loc2, matched) = match loc1 scanner '='
+          in (loc2, addToken (if matched then LESS_EQUAL else LESS) loc2 scanner)
         '>' ->
-          let (m_loc, expected) = match loc1 scanner '='
-          in (m_loc, addToken (if expected then GREATER_EQUAL else GREATER) m_loc scanner)
-
+          let (loc2, matched) = match loc1 scanner '='
+          in (loc2, addToken (if matched then GREATER_EQUAL else GREATER) loc2 scanner)
 
         -- default value
         u_val ->
@@ -333,6 +358,6 @@ main = do
       let scanner = initScanner result
       let tsl = reverseTokensErrorsFromTsl $ scanTokens loc scanner
       prettyPrintScanner (tsl_scanner tsl) ShowSourceErrors
-  
+
     _ -> error "Too many args. Can only take one arg"
 
