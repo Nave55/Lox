@@ -103,11 +103,6 @@ data Tsl = Tsl
   }
   deriving (Show)
 
--- basic functions
-
-sliceBs :: Int -> Int -> BS.ByteString -> BS.ByteString
-sliceBs i j bs = BS.take (j - i) (BS.drop i bs)
-
 -- string and error functions
 
 createError :: Int -> String -> String
@@ -154,8 +149,14 @@ createTsl tsl_token tsl_scanner tsl_loc =
 
 -- scanner core
 
-isAtEnd :: Int -> Int -> Bool
-isAtEnd curr len = curr >= len
+sliceBs :: Int -> Int -> BS.ByteString -> BS.ByteString
+sliceBs i j bs = BS.take (j - i) (BS.drop i bs)
+
+sourceLen :: Scanner -> Int
+sourceLen scanner = BS.length $ s_source scanner
+
+isAtEnd :: Loc -> Scanner -> Bool
+isAtEnd loc scanner = l_current loc >= sourceLen scanner
 
 advance :: Loc -> Scanner -> (Loc, Char)
 advance loc scanner =
@@ -176,23 +177,43 @@ addTokenWithLiteral t_type literal loc scanner =
       token    = createToken t_type text literal (l_line loc)
   in scanner { s_tokens = token : s_tokens scanner }
 
+match :: Loc -> Scanner -> Char -> (Loc, Bool)
+match loc scanner expected 
+  | isAtEnd loc scanner = (loc, False)
+  | BS.index (s_source scanner) (l_current loc) /= expected = (loc, False)
+  | otherwise = (loc {l_current = l_current loc + 1}, True)
+
 -- scan a single token
 
 scanToken :: Loc -> Scanner -> (Loc, Scanner)
 scanToken loc scanner =
   let (loc1, c) = advance loc scanner
       (loc2, scanner1) = case c of
-        -- single characters
-        '('  -> (loc1, addToken LEFT_PAREN  loc1 scanner)
-        ')'  -> (loc1, addToken RIGHT_PAREN loc1 scanner)
-        '{'  -> (loc1, addToken LEFT_BRACE  loc1 scanner)
-        '}'  -> (loc1, addToken RIGHT_BRACE loc1 scanner)
-        ','  -> (loc1, addToken COMMA       loc1 scanner)
-        '.'  -> (loc1, addToken DOT         loc1 scanner)
-        '-'  -> (loc1, addToken MINUS       loc1 scanner)
-        '+'  -> (loc1, addToken PLUS        loc1 scanner)
-        ';'  -> (loc1, addToken SEMICOLON   loc1 scanner)
-        '*'  -> (loc1, addToken STAR        loc1 scanner)
+        -- single character
+        '(' -> (loc1, addToken LEFT_PAREN  loc1 scanner)
+        ')' -> (loc1, addToken RIGHT_PAREN loc1 scanner)
+        '{' -> (loc1, addToken LEFT_BRACE  loc1 scanner)
+        '}' -> (loc1, addToken RIGHT_BRACE loc1 scanner)
+        ',' -> (loc1, addToken COMMA       loc1 scanner)
+        '.' -> (loc1, addToken DOT         loc1 scanner)
+        '-' -> (loc1, addToken MINUS       loc1 scanner)
+        '+' -> (loc1, addToken PLUS        loc1 scanner)
+        ';' -> (loc1, addToken SEMICOLON   loc1 scanner)
+        '*' -> (loc1, addToken STAR        loc1 scanner)
+
+        -- single or double characters
+        '!' ->
+          let (m_loc, expected) = match loc1 scanner '='
+          in (m_loc, addToken (if expected then BANG_EQUAL else BANG) m_loc scanner)
+        '=' ->
+          let (m_loc, expected) = match loc1 scanner '='
+          in (m_loc, addToken (if expected then EQUAL_EQUAL else EQUAL) m_loc scanner)
+        '<' ->
+          let (m_loc, expected) = match loc1 scanner '='
+          in (m_loc, addToken (if expected then LESS_EQUAL else LESS) m_loc scanner)
+        '>' ->
+          let (m_loc, expected) = match loc1 scanner '='
+          in (m_loc, addToken (if expected then GREATER_EQUAL else GREATER) m_loc scanner)
 
         -- new line
         '\n' ->
@@ -207,7 +228,7 @@ scanToken loc scanner =
 
 scanTokens :: Loc -> Scanner -> Tsl
 scanTokens loc scanner
-  | isAtEnd (l_current loc) (BS.length $ s_source scanner) =
+  | isAtEnd loc scanner =
       let eofTok = createToken EOF BS.empty L_NIL (l_line loc)
           scanner1 = scanner { s_tokens = eofTok : s_tokens scanner }
       in createTsl eofTok scanner1 loc
