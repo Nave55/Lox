@@ -207,25 +207,20 @@ scanToken loc scanner =
   let (loc1, c) = advance loc scanner
       (loc2, scanner1) = case c of
         -- single character
-        '(' -> (loc1, addToken LEFT_PAREN  loc1 scanner)
-        ')' -> (loc1, addToken RIGHT_PAREN loc1 scanner)
-        '{' -> (loc1, addToken LEFT_BRACE  loc1 scanner)
-        '}' -> (loc1, addToken RIGHT_BRACE loc1 scanner)
-        ',' -> (loc1, addToken COMMA       loc1 scanner)
-        '.' -> (loc1, addToken DOT         loc1 scanner)
-        '-' -> (loc1, addToken MINUS       loc1 scanner)
-        '+' -> (loc1, addToken PLUS        loc1 scanner)
-        ';' -> (loc1, addToken SEMICOLON   loc1 scanner)
-        '*' -> (loc1, addToken STAR        loc1 scanner)
-        ' ' -> (loc1, scanner)
+        '('  -> (loc1, addToken LEFT_PAREN  loc1 scanner)
+        ')'  -> (loc1, addToken RIGHT_PAREN loc1 scanner)
+        '{'  -> (loc1, addToken LEFT_BRACE  loc1 scanner)
+        '}'  -> (loc1, addToken RIGHT_BRACE loc1 scanner)
+        ','  -> (loc1, addToken COMMA       loc1 scanner)
+        '.'  -> (loc1, addToken DOT         loc1 scanner)
+        '-'  -> (loc1, addToken MINUS       loc1 scanner)
+        '+'  -> (loc1, addToken PLUS        loc1 scanner)
+        ';'  -> (loc1, addToken SEMICOLON   loc1 scanner)
+        '*'  -> (loc1, addToken STAR        loc1 scanner)
+        ' '  -> (loc1, scanner)
         '\r' -> (loc1, scanner)
         '\t' -> (loc1, scanner)
         '\n' -> (loc1 { l_line = l_line loc1 + 1 }, scanner)
-        '/' ->
-          let (loc2, matched) = match loc1 scanner '/'
-          in if matched
-              then (peekAdvance loc2 scanner, scanner)
-              else (loc2, addToken SLASH loc2 scanner)
 
         -- single or double characters
         '!' ->
@@ -240,6 +235,11 @@ scanToken loc scanner =
         '>' ->
           let (loc2, matched) = match loc1 scanner '='
           in (loc2, addToken (if matched then GREATER_EQUAL else GREATER) loc2 scanner)
+        '/' ->
+          let (loc2, matched) = match loc1 scanner '/'
+          in if matched
+              then (peekAdvance loc2 scanner, scanner)
+              else (loc2, addToken SLASH loc2 scanner)
 
         -- default value
         u_val ->
@@ -330,34 +330,32 @@ prettyPrintScanner scanner ShowSourceErrors = do
 
 -- main
 
--- run :: String -> String
--- run str = str
+run :: Loc -> String -> PpScanOp -> IO ()
+run loc source op = do
+  let scanner = initScanner source
+  let tsl = reverseTokensErrorsFromTsl $ scanTokens loc scanner
+  prettyPrintScanner (tsl_scanner tsl) op 
+  
+runFile :: Loc -> String -> IO ()
+runFile loc str = do
+  bytes <- readFile str
+  run loc bytes ShowSourceErrors
 
-runFile :: String -> IO String
-runFile = readFile
-
-runPrompt :: IO ()
-runPrompt = do
+runPrompt :: Loc -> IO ()
+runPrompt loc = do
   line <- getLine
   if line == ":q"
     then putStrLn "Quitting..."
     else do
       putStr "> "
-      -- let str = run line
-      putStrLn line
-      runPrompt
+      run loc line ShowSourceErrors
+      runPrompt loc
 
 main :: IO ()
 main = do
   let loc = initLoc
   args <- getArgs
   case args of
-    [] -> runPrompt
-    [p] -> do
-      result <- runFile p
-      let scanner = initScanner result
-      let tsl = reverseTokensErrorsFromTsl $ scanTokens loc scanner
-      prettyPrintScanner (tsl_scanner tsl) ShowSourceErrors
-
+    [] -> runPrompt loc
+    [p] -> runFile loc p
     _ -> error "Too many args. Can only take one arg"
-
