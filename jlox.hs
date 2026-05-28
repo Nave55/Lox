@@ -14,9 +14,6 @@ infixl 1 |>
 
 -- data --
 
--- data Err = OK | ERR | UNTERMINATED_STRING
---   deriving (Show)
-
 data TokenType
   = -- Single-character tokens
     LEFT_PAREN
@@ -95,26 +92,6 @@ data Loc = Loc
   , l_line    :: Int
   }
   deriving (Show)
-
--- data Tsl = Tsl
---   { tsl_token   :: Token
---   , tsl_scanner :: Scanner
---   , tsl_loc     :: Loc
---   }
---   deriving (Show)
-
--- data LocScan = LocScan
---   { ls_loc     :: Loc
---   , ls_scanner :: Scanner
---   }
---   deriving (Show)
-
--- data Lse = Lse
---   { loc     :: Loc
---   , scanner :: Scanner
---   , err     :: String
---   }
---   deriving (Show)
 
 -- string and error functions
 
