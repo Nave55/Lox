@@ -5,6 +5,7 @@ import Data.Char
 import Data.Maybe
 import Data.Bits
 import Data.Bifunctor
+import Text.Read (readMaybe)
 import System.Environment (getArgs)
 import qualified Data.ByteString.Char8 as BS
 
@@ -152,6 +153,9 @@ sourceLen scanner = BS.length $ s_source scanner
 charAtCur :: Loc -> Scanner -> Char
 charAtCur loc scanner = BS.index (s_source scanner) (l_current loc)
 
+charAtCurOff :: Loc -> Scanner -> Int -> Char
+charAtCurOff loc scanner off = BS.index (s_source scanner) (l_current loc + off)
+
 isAtEnd :: Loc -> Scanner -> Bool
 isAtEnd loc scanner = l_current loc >= sourceLen scanner
 
@@ -161,6 +165,22 @@ advance loc scanner =
       n_curr = l_current loc + 1
       loc1   = loc { l_current = n_curr }
   in (loc1, c)
+
+peek :: Loc -> Scanner -> Char
+peek loc scanner
+  | isAtEnd loc scanner = '\0'
+  | otherwise = charAtCur loc scanner
+
+peekNext :: Loc -> Scanner -> Char
+peekNext loc scanner
+  | l_current loc + 1 >= BS.length (s_source scanner) = '\0'
+  | otherwise = BS.index (s_source scanner) (l_current loc + 1)
+
+match :: Loc -> Scanner -> Char -> (Loc, Bool)
+match loc scanner expected
+  | isAtEnd loc scanner = (loc, False)
+  | charAtCur loc scanner /= expected = (loc, False)
+  | otherwise = (loc {l_current = l_current loc + 1}, True)
 
 -- addToken variants (like Java: addToken(type) and addToken(type, literal))
 
@@ -173,50 +193,76 @@ addTokenWithLiteral t_type literal loc scanner =
       token = createToken t_type text literal (l_line loc)
   in scanner { s_tokens = token : s_tokens scanner }
 
-match :: Loc -> Scanner -> Char -> (Loc, Bool)
-match loc scanner expected
-  | isAtEnd loc scanner = (loc, False)
-  | charAtCur loc scanner /= expected = (loc, False)
-  | otherwise = (loc {l_current = l_current loc + 1}, True)
+-- for SLASH
 
-peek :: Loc -> Scanner -> Char
-peek loc scanner
-  | isAtEnd loc scanner = '\0'
-  | otherwise = charAtCur loc scanner
-
-parseSlash :: Loc -> Scanner -> Bool -> (Loc, Scanner)
-parseSlash loc scanner matched
-  | matched =
+parseSlash :: Loc -> Scanner -> (Loc, Scanner)
+parseSlash loc scanner =
+  if matched
+     then consumeComment loc2 scanner
+     else (loc, addTokenWithLiteral SLASH Nothing loc scanner)
+  where
+    consumeComment loc scanner =
       let c = peek loc scanner
       in if c /= '\n' && not (isAtEnd loc scanner)
-           then
-             let (loc1, _) = advance loc scanner
-             in parseSlash loc1 scanner True
-           else
-             (loc, scanner)
-  | otherwise =
-      (loc, addToken SLASH loc scanner)
+        then
+          let (loc1, _) = advance loc scanner
+          in consumeComment loc1 scanner
+        else
+          (loc, scanner)
+    (loc2, matched) = match loc scanner '/'
+
+-- for STRING
 
 parseString :: Loc -> Scanner -> (Loc, Scanner)
 parseString loc scanner
   | peek loc scanner /= '"' && not (isAtEnd loc scanner) =
-      let loc1 = if peek loc scanner == '\n'
-          then loc {l_line = l_line loc + 1}
-          else loc
+      let loc1 =
+            if peek loc scanner == '\n'
+              then loc { l_line = l_line loc + 1 }
+              else loc
 
           (loc2, _) = advance loc1 scanner
       in parseString loc2 scanner
 
   | isAtEnd loc scanner =
-      let err = createError (l_line loc) "Unterminated String."
+      let err = createError (l_line loc) "Unterminated string."
       in (loc, scanner { s_errors = err : s_errors scanner })
 
   | otherwise =
       let (loc1, _) = advance loc scanner
-          val = sliceStartCurrentOff loc1 scanner 1 (-1)
-      in (loc1, addTokenWithLiteral STRING (Just (L_STRING (BS.unpack val))) loc1 scanner)  
-    
-  
+          val       = sliceStartCurrentOff loc1 scanner 1 (-1)
+          lit       = Just (L_STRING (BS.unpack val))
+      in (loc1, addTokenWithLiteral STRING lit loc1 scanner)
+
+-- for NUMBER
+
+parseNumber :: Loc -> Scanner -> (Loc, Scanner)
+parseNumber loc scanner =
+  let loc1 = consumeDigits loc
+
+      loc2 =
+        if peek loc1 scanner == '.' && isDigit (peekNext loc1 scanner)
+          then fst (advance loc1 scanner)
+          else loc1
+
+      loc3 = consumeDigits loc2
+  in
+    (loc3, addTokenWithLiteral NUMBER (parseSourceToDouble loc3) loc3 scanner)
+
+  where
+    consumeDigits loc
+      | isDigit (peek loc scanner) =
+          let (loc1, _) = advance loc scanner
+          in consumeDigits loc1
+      | otherwise = loc
+
+    parseSourceToDouble loc =
+      let slice = sliceStartCurrent loc scanner
+      in
+        case readMaybe (BS.unpack slice) of
+          Just d  -> Just (L_NUMBER d)
+          Nothing -> Nothing
+
 -- scan a single token
 
 scanToken :: Loc -> Scanner -> (Loc, Scanner)
@@ -253,12 +299,11 @@ scanToken loc scanner =
           let (loc2, matched) = match loc1 scanner '='
           in (loc2, addToken (if matched then GREATER_EQUAL else GREATER) loc2 scanner)
 
-        -- single or more character
-        '/' ->
-          let (loc2, matched) = match loc1 scanner '/'
-          in parseSlash loc2 scanner matched
+        -- single or two or more characters
+        '/' -> parseSlash loc1 scanner
         '"' -> parseString loc1 scanner
-            
+        _ | isDigit c -> parseNumber loc scanner
+
         -- default value
         u_val ->
           let err = createError (l_line loc1) ("Unexpected Character '" ++ [u_val] ++ "'")
@@ -269,12 +314,12 @@ scanToken loc scanner =
 scanTokens :: Loc -> Scanner -> (Loc, Scanner)
 scanTokens loc scanner
   | isAtEnd loc scanner =
-      let eofTok = createToken EOF BS.empty Nothing (l_line loc)
+      let eofTok   = createToken EOF BS.empty Nothing (l_line loc)
           scanner1 = scanner { s_tokens = eofTok : s_tokens scanner }
       in (loc, scanner1)
 
   | otherwise =
-      let loc1      = loc { l_start = l_current loc }
+      let loc1             = loc { l_start = l_current loc }
           (loc2, scanner2) = scanToken loc1 scanner
       in scanTokens loc2 scanner2
 
@@ -301,7 +346,8 @@ prettyPrintToken :: Token -> IO ()
 prettyPrintToken token = do
   putStrLn "Token: "
   putStrLn $ "  type    = " ++ show (t_type token)
-  putStrLn $ "  lexeme  = " ++ BS.unpack (t_lexeme token)
+  putStrLn $ "  lexeme  = " ++ show (t_lexeme token)
+  -- putStrLn $ "  lexeme  = " ++ BS.unpack (t_lexeme token)
   putStrLn $ "  literal = " ++ show (t_literal token)
   putStrLn $ "  line    = " ++ show (t_line token)
   -- putStrLn ""
@@ -312,7 +358,6 @@ prettyPrintLoc loc = do
   putStrLn $ "  start   = " ++ show (l_start loc)
   putStrLn $ "  current = " ++ show (l_current loc)
   putStrLn $ "  line    = " ++ show (l_line loc)
-
 
 data PpScanOp = ShowTokensOnly | ShowSource | ShowErrors | ShowSourceErrors
 
@@ -337,11 +382,11 @@ prettyPrintScanner scanner ShowSourceErrors = do
 
 run :: Loc -> String -> PpScanOp -> IO ()
 run loc source op = do
-  let scanner = initScanner source
+  let scanner          = initScanner source
   let (loc1, scanner1) = scanTokens loc scanner
-  let scanner2 = reverseTokensErrorsFromScanner scanner1
-  prettyPrintScanner scanner2 op 
-  
+  let scanner2         = reverseTokensErrorsFromScanner scanner1
+  prettyPrintScanner scanner2 op
+
 runFile :: Loc -> String -> IO ()
 runFile loc file_path = do
   bytes <- readFile file_path
