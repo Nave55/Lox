@@ -1,10 +1,11 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import Data.List
 import Data.Char
 import Data.Maybe
-import Data.Bits
 import Data.Bifunctor
+import Data.Map.Internal
 import Text.Read (readMaybe)
 import System.Environment (getArgs)
 import qualified Data.ByteString.Char8 as BS
@@ -67,7 +68,7 @@ data TokenType
 
 data Literal
   = L_NUMBER Double
-  | L_STRING String
+  | L_STRING BS.ByteString
   | L_BOOL   Bool
   | L_NIL
   deriving (Show)
@@ -107,6 +108,8 @@ tokenToString :: Token -> String
 tokenToString token =
   show (t_type token) ++ " " ++ show (t_lexeme token) ++ " " ++ show (t_literal token)
 
+-- create records
+
 createToken :: TokenType -> BS.ByteString -> Maybe Literal -> Int -> Token
 createToken t_type t_lexeme t_literal t_line =
   Token { t_type, t_lexeme, t_literal, t_line }
@@ -134,7 +137,7 @@ createLoc :: Int -> Int -> Int -> Loc
 createLoc l_start l_current l_line =
   Loc { l_start, l_current, l_line }
 
--- scanner core
+-- lexer core
 
 sliceBs :: Int -> Int -> BS.ByteString -> BS.ByteString
 sliceBs i j bs = BS.take (j - i) (BS.drop i bs)
@@ -182,6 +185,25 @@ match loc scanner expected
   | charAtCur loc scanner /= expected = (loc, False)
   | otherwise = (loc {l_current = l_current loc + 1}, True)
 
+keyword :: BS.ByteString -> Maybe TokenType
+keyword "and"    = Just AND
+keyword "class"  = Just CLASS
+keyword "else"   = Just ELSE
+keyword "false"  = Just FALSE
+keyword "fun"    = Just FUN
+keyword "for"    = Just FOR
+keyword "if"     = Just IF
+keyword "nil"    = Just NIL
+keyword "or"     = Just OR
+keyword "print"  = Just PRINT
+keyword "return" = Just RETURN
+keyword "super"  = Just SUPER
+keyword "this"   = Just THIS
+keyword "true"   = Just TRUE
+keyword "var"    = Just VAR
+keyword "while"  = Just WHILE
+keyword _        = Nothing
+
 -- addToken variants (like Java: addToken(type) and addToken(type, literal))
 
 addToken :: TokenType -> Loc -> Scanner -> Scanner
@@ -193,8 +215,8 @@ addTokenWithLiteral t_type literal loc scanner =
       token = createToken t_type text literal (l_line loc)
   in scanner { s_tokens = token : s_tokens scanner }
 
-parseSlash :: Loc -> Scanner -> (Loc, Scanner)
-parseSlash loc scanner
+parseSlashes :: Loc -> Scanner -> (Loc, Scanner)
+parseSlashes loc scanner
   | matched   = consumeComment loc1
   | otherwise = (loc, addTokenWithLiteral SLASH Nothing loc scanner)
   where
@@ -209,8 +231,8 @@ parseSlash loc scanner
            else
              (loc, scanner)
 
-parseString :: Loc -> Scanner -> (Loc, Scanner)
-parseString loc scanner
+parseStrings :: Loc -> Scanner -> (Loc, Scanner)
+parseStrings loc scanner
   | peek loc scanner /= '"' && not (isAtEnd loc scanner) =
       let loc1 =
             if peek loc scanner == '\n'
@@ -218,7 +240,7 @@ parseString loc scanner
               else loc
 
           (loc2, _) = advance loc1 scanner
-      in parseString loc2 scanner
+      in parseStrings loc2 scanner
 
   | isAtEnd loc scanner =
       let err = createError (l_line loc) "Unterminated String."
@@ -227,11 +249,11 @@ parseString loc scanner
   | otherwise =
       let (loc1, _) = advance loc scanner
           val       = sliceStartCurrentOff loc1 scanner 1 (-1)
-          lit       = Just (L_STRING (BS.unpack val))
+          lit       = Just (L_STRING val)
       in (loc1, addTokenWithLiteral STRING lit loc1 scanner)
 
-parseNumber :: Loc -> Scanner -> (Loc, Scanner)
-parseNumber loc scanner =
+parseNumbers :: Loc -> Scanner -> (Loc, Scanner)
+parseNumbers loc scanner =
   let loc1 = consumeDigits loc
 
       loc2 =
@@ -256,6 +278,17 @@ parseNumber loc scanner =
         case readMaybe (BS.unpack slice) of
           Just d  -> Just (L_NUMBER d)
           Nothing -> Nothing
+
+parseKeywordsAndIdentifiers :: Loc -> Scanner -> (Loc, Scanner)
+parseKeywordsAndIdentifiers loc scanner 
+  | isAlphaNum (peek loc scanner) =
+        parseKeywordsAndIdentifiers (fst (advance loc scanner)) scanner
+
+  | otherwise =
+      let substr = sliceStartCurrent loc scanner
+          tt     = fromMaybe IDENTIFIER (keyword substr)
+      in (loc, addToken tt loc scanner)
+    
 
 -- scan a single token
 
@@ -294,9 +327,10 @@ scanToken loc scanner =
           in (loc2, addToken (if matched then GREATER_EQUAL else GREATER) loc2 scanner)
 
         -- single or two or more characters
-        '/' -> parseSlash loc1 scanner
-        '"' -> parseString loc1 scanner
-        _ | isDigit c -> parseNumber loc scanner
+        '/' -> parseSlashes loc1 scanner
+        '"' -> parseStrings loc1 scanner
+        _ | isDigit c -> parseNumbers loc scanner
+        _ | isAlpha c -> parseKeywordsAndIdentifiers loc scanner
 
         -- default value
         u_val ->
