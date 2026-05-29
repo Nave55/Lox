@@ -193,25 +193,21 @@ addTokenWithLiteral t_type literal loc scanner =
       token = createToken t_type text literal (l_line loc)
   in scanner { s_tokens = token : s_tokens scanner }
 
--- for SLASH
-
 parseSlash :: Loc -> Scanner -> (Loc, Scanner)
-parseSlash loc scanner =
-  if matched
-     then consumeComment loc2 scanner
-     else (loc, addTokenWithLiteral SLASH Nothing loc scanner)
+parseSlash loc scanner
+  | matched   = consumeComment loc1
+  | otherwise = (loc, addTokenWithLiteral SLASH Nothing loc scanner)
   where
-    consumeComment loc scanner =
+    (loc1, matched) = match loc scanner '/'
+
+    consumeComment loc =
       let c = peek loc scanner
       in if c /= '\n' && not (isAtEnd loc scanner)
-        then
-          let (loc1, _) = advance loc scanner
-          in consumeComment loc1 scanner
-        else
-          (loc, scanner)
-    (loc2, matched) = match loc scanner '/'
-
--- for STRING
+           then
+             let (loc1, _) = advance loc scanner
+             in consumeComment loc1
+           else
+             (loc, scanner)
 
 parseString :: Loc -> Scanner -> (Loc, Scanner)
 parseString loc scanner
@@ -225,7 +221,7 @@ parseString loc scanner
       in parseString loc2 scanner
 
   | isAtEnd loc scanner =
-      let err = createError (l_line loc) "Unterminated string."
+      let err = createError (l_line loc) "Unterminated String."
       in (loc, scanner { s_errors = err : s_errors scanner })
 
   | otherwise =
@@ -233,8 +229,6 @@ parseString loc scanner
           val       = sliceStartCurrentOff loc1 scanner 1 (-1)
           lit       = Just (L_STRING (BS.unpack val))
       in (loc1, addTokenWithLiteral STRING lit loc1 scanner)
-
--- for NUMBER
 
 parseNumber :: Loc -> Scanner -> (Loc, Scanner)
 parseNumber loc scanner =
