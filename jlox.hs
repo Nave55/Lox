@@ -5,7 +5,6 @@ import Data.List
 import Data.Char
 import Data.Maybe
 import Data.Bifunctor
-import Data.Map.Internal
 import Text.Read (readMaybe)
 import System.Environment (getArgs)
 import qualified Data.ByteString.Char8 as BS
@@ -69,8 +68,8 @@ data TokenType
 data Literal
   = L_NUMBER Double
   | L_STRING BS.ByteString
-  | L_BOOL   Bool
-  | L_NIL
+  -- | L_BOOL   Bool
+  -- | L_NIL
   deriving (Show)
 
 data Token = Token
@@ -137,10 +136,14 @@ createLoc :: Int -> Int -> Int -> Loc
 createLoc l_start l_current l_line =
   Loc { l_start, l_current, l_line }
 
--- lexer core
+-- basic functions
 
 sliceBs :: Int -> Int -> BS.ByteString -> BS.ByteString
 sliceBs i j bs = BS.take (j - i) (BS.drop i bs)
+
+-- LEXER CORE
+
+-- lexer helper functions
 
 sliceStartCurrent :: Loc -> Scanner -> BS.ByteString
 sliceStartCurrent loc scanner =
@@ -204,8 +207,6 @@ keyword "var"    = Just VAR
 keyword "while"  = Just WHILE
 keyword _        = Nothing
 
--- addToken variants (like Java: addToken(type) and addToken(type, literal))
-
 addToken :: TokenType -> Loc -> Scanner -> Scanner
 addToken t_type = addTokenWithLiteral t_type Nothing
 
@@ -215,8 +216,8 @@ addTokenWithLiteral t_type literal loc scanner =
       token = createToken t_type text literal (l_line loc)
   in scanner { s_tokens = token : s_tokens scanner }
 
-parseSlashes :: Loc -> Scanner -> (Loc, Scanner)
-parseSlashes loc scanner
+scanForSlashes :: Loc -> Scanner -> (Loc, Scanner)
+scanForSlashes loc scanner
   | matched   = consumeComment loc1
   | otherwise = (loc, addTokenWithLiteral SLASH Nothing loc scanner)
   where
@@ -231,8 +232,8 @@ parseSlashes loc scanner
            else
              (loc, scanner)
 
-parseStrings :: Loc -> Scanner -> (Loc, Scanner)
-parseStrings loc scanner
+scanForStrings :: Loc -> Scanner -> (Loc, Scanner)
+scanForStrings loc scanner
   | peek loc scanner /= '"' && not (isAtEnd loc scanner) =
       let loc1 =
             if peek loc scanner == '\n'
@@ -240,7 +241,7 @@ parseStrings loc scanner
               else loc
 
           (loc2, _) = advance loc1 scanner
-      in parseStrings loc2 scanner
+      in scanForStrings loc2 scanner
 
   | isAtEnd loc scanner =
       let err = createError (l_line loc) "Unterminated String."
@@ -252,8 +253,8 @@ parseStrings loc scanner
           lit       = Just (L_STRING val)
       in (loc1, addTokenWithLiteral STRING lit loc1 scanner)
 
-parseNumbers :: Loc -> Scanner -> (Loc, Scanner)
-parseNumbers loc scanner =
+scanForNumbers :: Loc -> Scanner -> (Loc, Scanner)
+scanForNumbers loc scanner =
   let loc1 = consumeDigits loc
 
       loc2 =
@@ -279,10 +280,10 @@ parseNumbers loc scanner =
           Just d  -> Just (L_NUMBER d)
           Nothing -> Nothing
 
-parseKeywordsAndIdentifiers :: Loc -> Scanner -> (Loc, Scanner)
-parseKeywordsAndIdentifiers loc scanner 
+scanForKeywordsAndIdentifiers :: Loc -> Scanner -> (Loc, Scanner)
+scanForKeywordsAndIdentifiers loc scanner 
   | isAlphaNum (peek loc scanner) =
-        parseKeywordsAndIdentifiers (fst (advance loc scanner)) scanner
+        scanForKeywordsAndIdentifiers (fst (advance loc scanner)) scanner
 
   | otherwise =
       let substr = sliceStartCurrent loc scanner
@@ -296,7 +297,7 @@ scanToken :: Loc -> Scanner -> (Loc, Scanner)
 scanToken loc scanner =
   let (loc1, c) = advance loc scanner
       (loc2, scanner1) = case c of
-        -- single character
+        -- 1 char
         '('  -> (loc1, addToken LEFT_PAREN  loc1 scanner)
         ')'  -> (loc1, addToken RIGHT_PAREN loc1 scanner)
         '{'  -> (loc1, addToken LEFT_BRACE  loc1 scanner)
@@ -312,7 +313,7 @@ scanToken loc scanner =
         '\t' -> (loc1, scanner)
         '\n' -> (loc1 { l_line = l_line loc1 + 1 }, scanner)
 
-        -- single or double characters
+        -- 1-2 chars
         '!' ->
           let (loc2, matched) = match loc1 scanner '='
           in (loc2, addToken (if matched then BANG_EQUAL else BANG) loc2 scanner)
@@ -326,11 +327,11 @@ scanToken loc scanner =
           let (loc2, matched) = match loc1 scanner '='
           in (loc2, addToken (if matched then GREATER_EQUAL else GREATER) loc2 scanner)
 
-        -- single or two or more characters
-        '/' -> parseSlashes loc1 scanner
-        '"' -> parseStrings loc1 scanner
-        _ | isDigit c -> parseNumbers loc scanner
-        _ | isAlpha c -> parseKeywordsAndIdentifiers loc scanner
+        -- 1+ chars 
+        '/' -> scanForSlashes loc1 scanner
+        '"' -> scanForStrings loc1 scanner
+        _ | isDigit c -> scanForNumbers loc scanner
+        _ | isAlpha c -> scanForKeywordsAndIdentifiers loc scanner
 
         -- default value
         u_val ->
