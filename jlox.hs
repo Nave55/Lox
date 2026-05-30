@@ -1,3 +1,5 @@
+-- Haskell port of the Jlox interpreter from https://craftinginterpreters.com
+
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
@@ -13,7 +15,23 @@ import qualified Data.ByteString.Char8 as BS
 x |> f = f x
 infixl 1 |>
 
--- data --
+-- string and error functions
+
+createError :: Int -> String -> String
+createError line = report line ""
+
+report :: Int -> String -> String -> String
+report line loc msg = do
+  "[line " ++ show line ++ "] Error" ++ loc ++ ": " ++ msg
+
+sliceBs :: Int -> Int -> BS.ByteString -> BS.ByteString
+sliceBs i j bs = BS.take (j - i) (BS.drop i bs)
+
+-- *******************************************
+--                  SCANNER
+-- *******************************************
+
+-- ATD's 
 
 data TokenType
   = -- Single-character tokens
@@ -68,8 +86,8 @@ data TokenType
 data Literal
   = L_NUMBER Double
   | L_STRING BS.ByteString
-  -- | L_BOOL   Bool
-  -- | L_NIL
+  | L_BOOL   Bool
+  | L_NIL
   deriving (Show)
 
 data Token = Token
@@ -94,20 +112,7 @@ data Loc = Loc
   }
   deriving (Show)
 
--- string and error functions
-
-createError :: Int -> String -> String
-createError line = report line ""
-
-report :: Int -> String -> String -> String
-report line loc msg = do
-  "[line " ++ show line ++ "] Error" ++ loc ++ ": " ++ msg
-
-tokenToString :: Token -> String
-tokenToString token =
-  show (t_type token) ++ " " ++ show (t_lexeme token) ++ " " ++ show (t_literal token)
-
--- create records
+-- functions to create ADT's
 
 createToken :: TokenType -> BS.ByteString -> Maybe Literal -> Int -> Token
 createToken t_type t_lexeme t_literal t_line =
@@ -136,14 +141,11 @@ createLoc :: Int -> Int -> Int -> Loc
 createLoc l_start l_current l_line =
   Loc { l_start, l_current, l_line }
 
--- basic functions
+-- scanner helper functions
 
-sliceBs :: Int -> Int -> BS.ByteString -> BS.ByteString
-sliceBs i j bs = BS.take (j - i) (BS.drop i bs)
-
--- LEXER CORE
-
--- lexer helper functions
+tokenToString :: Token -> String
+tokenToString token =
+  show (t_type token) ++ " " ++ show (t_lexeme token) ++ " " ++ show (t_literal token)
 
 sliceStartCurrent :: Loc -> Scanner -> BS.ByteString
 sliceStartCurrent loc scanner =
@@ -215,6 +217,8 @@ addTokenWithLiteral t_type literal loc scanner =
   let text  = sliceStartCurrent loc scanner
       token = createToken t_type text literal (l_line loc)
   in scanner { s_tokens = token : s_tokens scanner }
+
+-- scan functions
 
 scanForSlashes :: Loc -> Scanner -> (Loc, Scanner)
 scanForSlashes loc scanner
@@ -407,7 +411,9 @@ prettyPrintScanner scanner ShowSourceErrors = do
   mapM_ prettyPrintToken (s_tokens scanner)
   mapM_ putStrLn (s_errors scanner)
 
--- main
+-- *******************************************
+--                   MAIN
+-- *******************************************
 
 run :: Loc -> String -> PpScanOp -> IO ()
 run loc source op = do
