@@ -21,10 +21,10 @@ import qualified Data.ByteString.Char8 as BS
 --                             Type Aliases
 ---------------------------------------------------------------------------
 
-type EitherLit             = Either BS.ByteString Literal
+type EitherLit             = Either BS.ByteString LoxValue
 type EitherEnv             = Either BS.ByteString Env
 type EitherBsEnv           = Either BS.ByteString (BS.ByteString, Env)
-type EitherLitEnv          = Either BS.ByteString (Literal, Env)
+type EitherLitEnv          = Either BS.ByteString (LoxValue, Env)
 type EitherListBsEnv       = Either BS.ByteString ([BS.ByteString], Env)
 type EitherParserTok       = Either BS.ByteString (Parser, Token)
 type EitherStmtParser      = Either BS.ByteString (Stmt, Parser)
@@ -32,7 +32,7 @@ type EitherExprParser      = Either BS.ByteString (Expr, Parser)
 type EitherLoxCallable     = Either BS.ByteString LoxCallable
 type EitherListBsExecRes   = Either BS.ByteString ([BS.ByteString], ExecResult)
 type EitherListStmtParser  = Either BS.ByteString ([Stmt], Parser)
-type EitherListBsLitInterp = Either BS.ByteString ([BS.ByteString], Literal, Interpreter)
+type EitherListBsLitInterp = Either BS.ByteString ([BS.ByteString], LoxValue, Interpreter)
 
 ---------------------------------------------------------------------------
 --                            Helper Functions
@@ -115,7 +115,7 @@ data TokenType
   | EOF
   deriving (Show, Eq)
 
-data Literal
+data LoxValue
   = L_NUMBER Double
   | L_STRING BS.ByteString
   | L_BOOL   Bool
@@ -125,7 +125,7 @@ data Literal
   | L_CLASS LoxClass
   | L_INSTANCE LoxInstance
 
-instance Show Literal where
+instance Show LoxValue where
   show (L_NUMBER d)      = show d
   show (L_STRING s)      = show s
   show (L_BOOL b)        = show b
@@ -136,7 +136,7 @@ instance Show Literal where
   show (L_INSTANCE inst) =
     "<instance " ++ BS.unpack (lc_name (li_class inst)) ++ ">"
 
-instance Eq Literal where
+instance Eq LoxValue where
   L_NIL == L_NIL = True
   L_BOOL a == L_BOOL b = a == b
   L_STRING a == L_STRING b = a == b
@@ -150,7 +150,7 @@ instance Eq Literal where
 data Token = Token
   { t_type    :: TokenType
   , t_lexeme  :: BS.ByteString
-  , t_literal :: Maybe Literal
+  , t_literal :: Maybe LoxValue
   , t_line    :: Int
   }
   deriving (Show)
@@ -173,7 +173,7 @@ data Scanner = Scanner
 createToken
   :: TokenType
   -> BS.ByteString
-  -> Maybe Literal
+  -> Maybe LoxValue
   -> Int
   -> Token
 
@@ -192,7 +192,7 @@ initScanner s_source line =
     , s_errors = []
     }
 
-showLiteral :: Literal -> BS.ByteString
+showLiteral :: LoxValue -> BS.ByteString
 showLiteral (L_NUMBER n) = formatNum n 10
 showLiteral (L_STRING s) = s
 showLiteral (L_BOOL b)   = if b then "true" else "false"
@@ -270,7 +270,7 @@ scannerMatch sc expected
 
 scannerAddTokenWithLiteral
   :: TokenType
-  -> Maybe Literal
+  -> Maybe LoxValue
   -> Scanner
   -> Scanner
 
@@ -551,7 +551,7 @@ prettyPrintScanner sc PpAll = do
 data Expr
   = E_ASSIGN   Token Expr          -- name value
   | E_BINARY   Expr Token Expr     -- left operator right
-  | E_LITERAL  (Maybe Literal)     -- value
+  | E_LITERAL  (Maybe LoxValue)     -- value
   | E_LOGICAL  Expr Token Expr     -- left operator right
   | E_UNARY    Token Expr          -- operator right
   | E_CALL     Expr Token [Expr]   -- callee paren args
@@ -653,7 +653,7 @@ parserMatchRest expr parser tokens func bl =
 ----------------------------------------------------------------------------------------
 
 data Env = Env
-  { e_map        :: SM.Map BS.ByteString Literal
+  { e_map        :: SM.Map BS.ByteString LoxValue
   , e_enclosing  :: Maybe Env
   , e_loop_depth :: Int
   }
@@ -681,11 +681,11 @@ enterLoop env = env { e_loop_depth = e_loop_depth env + 1 }
 exitLoop :: Env -> Env
 exitLoop env = env { e_loop_depth = e_loop_depth env - 1 }
 
-envDefine :: Env -> BS.ByteString -> Literal -> Env
+envDefine :: Env -> BS.ByteString -> LoxValue -> Env
 envDefine env key val =
   env { e_map = SM.insert key val (e_map env) }
 
-envAssign :: Env -> Token -> Literal -> EitherEnv
+envAssign :: Env -> Token -> LoxValue -> EitherEnv
 envAssign env name val =
   let key  = t_lexeme name
       line = t_line name
@@ -731,7 +731,7 @@ data LoxCallable = LoxCallable
   , lc_call
       :: Interpreter
       -> Token
-      -> [Literal]
+      -> [LoxValue]
       -> EitherListBsLitInterp
   }
 
@@ -817,7 +817,7 @@ wrapUserFunction fn =
     , lc_call  = callUserFunction fn
     }
 
-expectCallable :: Literal -> EitherLoxCallable
+expectCallable :: LoxValue -> EitherLoxCallable
 expectCallable (L_CALL c) = Right c
 expectCallable (L_FUNC f) = Right (wrapUserFunction f)
 expectCallable (L_CLASS k) = Right (classCallable k)
@@ -1042,19 +1042,19 @@ parsePrimary p0
 --                                 Expression Evaluation 
 -------------------------------------------------------------------------------------------
 
-exprIsTruthy :: Literal -> Bool
+exprIsTruthy :: LoxValue -> Bool
 exprIsTruthy lit
   | lit == L_NIL        = False
   | L_BOOL b <- lit     = b
   | otherwise           = True
 
-exprIsEqual :: Literal -> Literal -> Bool
+exprIsEqual :: LoxValue -> LoxValue -> Bool
 exprIsEqual a b
   | a == L_NIL && b == L_NIL = True
   | a == L_NIL = False
   | otherwise = a == b
 
-exprUnary :: Token -> Literal -> EitherLit
+exprUnary :: Token -> LoxValue -> EitherLit
 exprUnary op lit =
   let line = t_line op
   in case t_type op of
@@ -1076,7 +1076,7 @@ exprUnary op lit =
         line
         "Unknown unary operator " <> t_lexeme op
 
-exprBinary :: Literal -> Token -> Literal -> EitherLit
+exprBinary :: LoxValue -> Token -> LoxValue -> EitherLit
 exprBinary left op right =
   let line = t_line op
       tt   = t_type op
@@ -1317,7 +1317,7 @@ instance Show LoxClass where
 
 data LoxInstance = LoxInstance
   { li_class  :: LoxClass
-  , li_fields :: SM.Map BS.ByteString Literal
+  , li_fields :: SM.Map BS.ByteString LoxValue
   }
 
 instance Show LoxInstance where
@@ -1351,7 +1351,7 @@ bindThis fn inst =
       env1    = envDefine env0 "this" (L_INSTANCE inst)
   in fn { lf_closure = env1 }
 
-instanceGet :: LoxInstance -> Token -> Either BS.ByteString Literal
+instanceGet :: LoxInstance -> Token -> Either BS.ByteString LoxValue
 instanceGet inst nameTok =
   case SM.lookup (t_lexeme nameTok) (li_fields inst) of
     Just v  -> Right v
@@ -1362,7 +1362,7 @@ instanceGet inst nameTok =
           Left (loxError (t_line nameTok)
                 ("Undefined property '" <> t_lexeme nameTok <> "'"))
 
-instanceSet :: LoxInstance -> Token -> Literal -> LoxInstance
+instanceSet :: LoxInstance -> Token -> LoxValue -> LoxInstance
 instanceSet inst nameTok value =
   inst { li_fields = SM.insert (t_lexeme nameTok) value (li_fields inst) }
 
@@ -1759,14 +1759,9 @@ data ExecResult
   = ER_NORMAL   Interpreter
   | ER_BREAK    Interpreter
   | ER_CONTINUE Interpreter
-  | ER_RETURN   Literal Interpreter
+  | ER_RETURN   LoxValue Interpreter
 
-execBlock
-  :: Interpreter
-  -> [BS.ByteString]
-  -> [Stmt]
-  -> EitherListBsExecRes
-
+execBlock :: Interpreter -> [BS.ByteString] -> [Stmt] -> EitherListBsExecRes
 execBlock interp0 = go interp1
   where
     env0    = i_environment interp0
