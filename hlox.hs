@@ -551,7 +551,7 @@ prettyPrintScanner sc PpAll = do
 data Expr
   = E_ASSIGN   Token Expr          -- name value
   | E_BINARY   Expr Token Expr     -- left operator right
-  | E_LITERAL  (Maybe LoxValue)     -- value
+  | E_LITERAL  (Maybe LoxValue)    -- value
   | E_LOGICAL  Expr Token Expr     -- left operator right
   | E_UNARY    Token Expr          -- operator right
   | E_CALL     Expr Token [Expr]   -- callee paren args
