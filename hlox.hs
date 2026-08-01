@@ -107,7 +107,7 @@ data TokenType
 
   -- Keywords
   | AND   | CLASS | ELSE   | FALSE
-  | FUNC  | FOR   | IF     | NIL
+  | FUN  | FOR   | IF     | NIL
   | OR    | PRINT | RETURN | SUPER
   | THIS  | TRUE  | VAR    | WHILE
   | BREAK | CONTINUE
@@ -121,7 +121,7 @@ data LoxValue
   | L_BOOL   Bool
   | L_NIL
   | L_CALL  LoxCallable
-  | L_FUNC  LoxFunction
+  | L_FUN  LoxFunction
   | L_CLASS LoxClass
   | L_INSTANCE LoxInstance
 
@@ -130,7 +130,7 @@ instance Show LoxValue where
   show (L_STRING s)      = show s
   show (L_BOOL b)        = show b
   show L_NIL             = "nil"
-  show (L_FUNC x)        = "<fn>"
+  show (L_FUN x)        = "<fn>"
   show (L_CALL x)        = "<native fn>"
   show (L_CLASS c)       = "<class " ++ BS.unpack (lc_name c) ++ ">"
   show (L_INSTANCE inst) =
@@ -197,7 +197,7 @@ showLiteral (L_NUMBER n) = formatNum n 10
 showLiteral (L_STRING s) = s
 showLiteral (L_BOOL b)   = if b then "true" else "false"
 showLiteral L_NIL        = "nil"
-showLiteral (L_FUNC _)   = "<fn>"
+showLiteral (L_FUN _)   = "<fn>"
 showLiteral (L_CALL _)   = "<native fn>"
 showLiteral (L_CLASS klass)  = lc_name klass
 showLiteral (L_INSTANCE inst) = BS.pack (show inst)
@@ -363,7 +363,7 @@ scanForKeywordsAndIdentifiers sc
     keyword "class"    = Just CLASS
     keyword "else"     = Just ELSE
     keyword "false"    = Just FALSE
-    keyword "func"     = Just FUNC
+    keyword "fun"      = Just FUN
     keyword "for"      = Just FOR
     keyword "if"       = Just IF
     keyword "nil"      = Just NIL
@@ -551,7 +551,7 @@ prettyPrintScanner sc PpAll = do
 data Expr
   = E_ASSIGN   Token Expr          -- name value
   | E_BINARY   Expr Token Expr     -- left operator right
-  | E_LITERAL  (Maybe LoxValue)    -- value
+  | E_LITERAL  (Maybe LoxValue)     -- value
   | E_LOGICAL  Expr Token Expr     -- left operator right
   | E_UNARY    Token Expr          -- operator right
   | E_CALL     Expr Token [Expr]   -- callee paren args
@@ -618,7 +618,7 @@ synchronize = go . parserAdvance
       | otherwise = go (parserAdvance parser)
 
     syncStarters =
-      [ CLASS, FUNC, VAR, FOR, IF, WHILE, PRINT, RETURN ]
+      [ CLASS, FUN, VAR, FOR, IF, WHILE, PRINT, RETURN ]
 
 data BinaryOrLogical = Binary | Logical
   deriving (Eq)
@@ -819,7 +819,7 @@ wrapUserFunction fn =
 
 expectCallable :: LoxValue -> EitherLoxCallable
 expectCallable (L_CALL c) = Right c
-expectCallable (L_FUNC f) = Right (wrapUserFunction f)
+expectCallable (L_FUN f) = Right (wrapUserFunction f)
 expectCallable (L_CLASS k) = Right (classCallable k)
 expectCallable _          = Left "Can only call functions and classes."
 
@@ -1281,7 +1281,7 @@ exprEval interp0 (E_SUPER superTok methodTok) = do
             ("Undefined property '" <> methodName <> "'"))
     Just fn -> do
       let bound = bindThis fn inst
-      pure ([], L_FUNC bound, interp0)
+      pure ([], L_FUN bound, interp0)
 
 ---------------------------------------------------------------------------------------
 --                                    Statements
@@ -1357,7 +1357,7 @@ instanceGet inst nameTok =
     Just v  -> Right v
     Nothing ->
       case findMethod (li_class inst) (t_lexeme nameTok) of
-        Just fn -> Right (L_FUNC (bindThis fn inst))
+        Just fn -> Right (L_FUN (bindThis fn inst))
         Nothing ->
           Left (loxError (t_line nameTok)
                 ("Undefined property '" <> t_lexeme nameTok <> "'"))
@@ -1735,7 +1735,7 @@ stmtDeclaration p0 =
   case parserMatch [CLASS] p0 of
     (True, p1) -> stmtClassDeclaration p1
     _ ->
-      case parserMatch [FUNC] p0 of
+      case parserMatch [FUN] p0 of
         (True, p1) -> stmtFunction p1 "function"
         _ ->
           case parserMatch [VAR] p0 of
@@ -1960,7 +1960,7 @@ stmtExec interp S_CONTINUE =
 
 stmtExec interp0 (S_FUNCTION name params body) =
   let env0 = i_environment interp0
-      env1 = envDefine env0 (t_lexeme name) (L_FUNC fn)
+      env1 = envDefine env0 (t_lexeme name) (L_FUN fn)
       fn   = newLoxFunction name params body env1 False
       interp1 = interp0 { i_environment = env1 }
   in Right ([], ER_NORMAL interp1)
