@@ -22,7 +22,6 @@ A pure, persistent-structure implementation of jLox.
 ### Notes
 * I am **Not** an expert haskell developer so there are probably lots of mistakes and non idiomatic code.
 
-- Changed `Fun` → `Func` so Go-style highlighting works better
 - Added `+=` operator
 - Implemented proper `for` statement
 - Added `break` and `continue`
