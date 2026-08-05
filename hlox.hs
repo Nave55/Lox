@@ -3,10 +3,8 @@ module Main where
 
 -- Haskell port of the Jlox interpreter from https://craftinginterpreters.com
 
-import Data.List
-import Debug.Trace
+import Data.List (dropWhileEnd)
 import Numeric (showFFloat)
-import Text.Read (readMaybe)
 import Data.Maybe (fromMaybe)
 import System.IO (hFlush, stdout)
 import System.Environment (getArgs)
@@ -23,9 +21,6 @@ import qualified Data.ByteString.Char8 as BS
 
 type EitherLit             = Either BS.ByteString LoxValue
 type EitherEnv             = Either BS.ByteString Env
-type EitherBsEnv           = Either BS.ByteString (BS.ByteString, Env)
-type EitherLitEnv          = Either BS.ByteString (LoxValue, Env)
-type EitherListBsEnv       = Either BS.ByteString ([BS.ByteString], Env)
 type EitherParserTok       = Either BS.ByteString (Parser, Token)
 type EitherStmtParser      = Either BS.ByteString (Stmt, Parser)
 type EitherExprParser      = Either BS.ByteString (Expr, Parser)
@@ -76,16 +71,26 @@ formatNum n l =
   BS.pack (stripDotZero (showFFloat Nothing (round' n l) ""))
 
   where
+    stripDotZero :: String -> String
     stripDotZero s =
       case break (== '.') s of
-        (int, "") -> int
+        (int, "") ->
+          int
+
         (int, '.':frac) ->
           if all (== '0') frac
             then int
             else int ++ "." ++ dropWhileEnd (== '0') frac
 
-    round' num sg = (fromIntegral . round $ num * f) / f
-        where !f = 10^sg
+        _ -> s
+
+    round' :: Double -> Integer -> Double
+    round' num sg =
+      let f :: Double
+          f = 10 ** fromIntegral sg
+          rounded :: Integer
+          rounded = round (num * f)
+      in fromIntegral rounded / f
 
 ----------------------------------------------------------------------
 --                              SCANNER
@@ -130,8 +135,8 @@ instance Show LoxValue where
   show (L_STRING s)      = show s
   show (L_BOOL b)        = show b
   show L_NIL             = "nil"
-  show (L_FUN x)        = "<fn>"
-  show (L_CALL x)        = "<native fn>"
+  show (L_FUN _)        = "<fn>"
+  show (L_CALL _)        = "<native fn>"
   show (L_CLASS c)       = "<class " ++ BS.unpack (lc_name c) ++ ">"
   show (L_INSTANCE inst) =
     "<instance " ++ BS.unpack (lc_name (li_class inst)) ++ ">"
@@ -401,24 +406,24 @@ scanToken sc0 =
 
         -- 1-2 chars
         '+'  ->
-          let (sc2, matched) = scannerMatch sc1 '='
-          in scannerAddToken (if matched then PLUS_EQUAL else PLUS) sc2
+          let (scNext, matched) = scannerMatch sc1 '='
+          in scannerAddToken (if matched then PLUS_EQUAL else PLUS) scNext
         '-'  ->
-          let (sc2, matched) = scannerMatch sc1 '='
-          in scannerAddToken (if matched then MINUS_EQUAL else MINUS) sc2
+          let (scNext, matched) = scannerMatch sc1 '='
+          in scannerAddToken (if matched then MINUS_EQUAL else MINUS) scNext
 
         '!' ->
-          let (sc2, matched) = scannerMatch sc1 '='
-          in scannerAddToken (if matched then BANG_EQUAL else BANG) sc2
+          let (scNext, matched) = scannerMatch sc1 '='
+          in scannerAddToken (if matched then BANG_EQUAL else BANG) scNext
         '=' ->
-          let (sc2, matched) = scannerMatch sc1 '='
-          in scannerAddToken (if matched then EQUAL_EQUAL else EQUAL) sc2
+          let (scNext, matched) = scannerMatch sc1 '='
+          in scannerAddToken (if matched then EQUAL_EQUAL else EQUAL) scNext
         '<' ->
-          let (sc2, matched) = scannerMatch sc1 '='
-          in scannerAddToken (if matched then LESS_EQUAL else LESS) sc2
+          let (scNext, matched) = scannerMatch sc1 '='
+          in scannerAddToken (if matched then LESS_EQUAL else LESS) scNext
         '>' ->
-          let (sc2, matched) = scannerMatch sc1 '='
-          in scannerAddToken (if matched then GREATER_EQUAL else GREATER) sc2
+          let (scNext, matched) = scannerMatch sc1 '='
+          in scannerAddToken (if matched then GREATER_EQUAL else GREATER) scNext
 
         -- 1+ chars 
         '/' -> scanForSlashes sc1
@@ -571,6 +576,8 @@ data Expr
 data Parser = Parser [Token] Token Token
   deriving (Show)
 
+createParser :: [Token] -> Parser
+createParser [] = error "createParser requires a non empty list"
 createParser (x:xs) =
   let dummy = Token EOF "" Nothing (t_line x)
   in Parser xs dummy x
@@ -585,7 +592,8 @@ parserIsAtEnd :: Parser -> Bool
 parserIsAtEnd p = t_type (parserPeek p) == EOF
 
 parserAdvance :: Parser -> Parser
-parserAdvance (Parser (t:ts) prev cur) =
+parserAdvance (Parser [] _ _) = error "parserAdvance requires a non empty list"
+parserAdvance (Parser (t:ts) _ cur) =
   Parser ts cur t
 
 parserCheck :: Parser -> TokenType -> Bool
@@ -767,7 +775,8 @@ newLoxFunction name params body closure isInit =
               , lf_initializer = isInit
               }
 
-callUserFunction fn interp0 tok args = do
+callUserFunction :: LoxFunction -> Interpreter -> Token -> [LoxValue] -> EitherListBsLitInterp
+callUserFunction fn interp0 _ args = do
   let callerEnv = i_environment interp0
       closure   = lf_closure fn
       params    = lf_params fn
@@ -932,53 +941,44 @@ parseCall p0 = do
   (expr0, p1) <- parsePrimary p0
   loop expr0 p1
   where
-    loop e0 p0 = do
-      case parserMatch [LEFT_PAREN] p0 of
-        (True, p1) -> do
-          (e1, p2) <- finishCall e0 p1
-          loop e1 p2
+    loop expr pIn = do
+      case parserMatch [LEFT_PAREN] pIn of
+        (True, pAfterParen) -> do
+          (exprCall, pAfterCall) <- finishCall expr pAfterParen
+          loop exprCall pAfterCall
 
         (False, _) ->
-          case parserMatch [DOT] p0 of
-            (True, p1') -> do
-              (p2, nameTok) <-
-                parserConsume
-                  IDENTIFIER
-                  "Expect property name after '.'."
-                  p1'
-              loop (E_GET e0 nameTok) p2
+          case parserMatch [DOT] pIn of
+            (True, pAfterDot) -> do
+              (pAfterName, nameTok) <-
+                parserConsume IDENTIFIER "Expect property name after '.'." pAfterDot
+              loop (E_GET expr nameTok) pAfterName
 
             (False, _) ->
-              Right (e0, p0)
+              Right (expr, pIn)
 
-    finishCall callee p0 = do
-      (p1, args)  <- fcLoop p0 0 []
-      (p2, paren) <-
-        parserConsume
-          RIGHT_PAREN
-          "Expect ')' after arguments."
-          p1
+    finishCall callee pIn = do
+      (pArgs, args) <- fcLoop pIn 0 []
+      (pClose, parenTok) <-
+        parserConsume RIGHT_PAREN "Expect ')' after arguments." pArgs
+      Right (E_CALL callee parenTok (reverse args), pClose)
 
-      Right (E_CALL callee paren (reverse args), p2)
-
-    fcLoop p0 len acc
-      | not (parserCheck p0 RIGHT_PAREN) =
+    fcLoop :: Parser -> Int -> [Expr] -> Either BS.ByteString (Parser, [Expr])
+    fcLoop pIn len acc
+      | not (parserCheck pIn RIGHT_PAREN) =
           if len >= 255
-            then
-              Left $
-                loxError
-                  (t_line $ parserPeek p0)
-                  "Can't have more than 255 arguments."
-
+            then Left $
+              loxError (t_line $ parserPeek pIn)
+                       "Can't have more than 255 arguments."
             else do
-              (expr, p1) <- parseExpression p0
-              let (m, p2) = parserMatch [COMMA] p1
-              if m
-                then fcLoop p2 (len + 1) (expr : acc)
-                else Right (p2, expr : acc)
+              (expr, pExpr) <- parseExpression pIn
+              let (matched, pComma) = parserMatch [COMMA] pExpr
+              if matched
+                then fcLoop pComma (len + 1) (expr : acc)
+                else Right (pExpr, expr : acc)
 
-      | otherwise
-          = Right (p0, reverse acc)
+      | otherwise =
+          Right (pIn, reverse acc)
 
 parseUnary :: Parser -> EitherExprParser
 parseUnary p0 =
@@ -1078,9 +1078,9 @@ exprUnary op lit =
 
 exprBinary :: LoxValue -> Token -> LoxValue -> EitherLit
 exprBinary left op right =
-  let line = t_line op
-      tt   = t_type op
-      lex  = t_lexeme op
+  let line   = t_line op
+      tt     = t_type op
+      lexeme = t_lexeme op
   in case tt of
     EQUAL_EQUAL -> Right (L_BOOL (exprIsEqual left right))
     BANG_EQUAL  -> Right (L_BOOL (not (exprIsEqual left right)))
@@ -1100,7 +1100,7 @@ exprBinary left op right =
               Left $
                 loxError
                 line
-                "Invalid numeric operator: " <> lex
+                "Invalid numeric operator: " <> lexeme
 
         (L_STRING l, L_STRING r) ->
           case tt of
@@ -1109,14 +1109,14 @@ exprBinary left op right =
               Left $
                 loxError
                 line
-                "Invalid string operator: " <> lex
+                "Invalid string operator: " <> lexeme
 
         _ ->
           Left (loxError line
                 ("Invalid Binary Operation ("
                  <> showLiteral left
                  <> " "
-                 <> lex
+                 <> lexeme
                  <> " "
                  <> showLiteral right
                  <> ")"))
@@ -1178,6 +1178,8 @@ exprEval i (E_LOGICAL l op r) = do
           (outsR, rv, i2) <- exprEval i1 r
           let outs = outsL ++ outsR
           Right (outs, rv, i2)
+
+    _ -> error "Internal error: E_LOGICAL with non-logical operator"
 
 exprEval i0 (E_CALL calleeExpr paren argExprs) = do
   (outsCallee, calleeLit, i1) <- exprEval i0 calleeExpr
@@ -1323,6 +1325,7 @@ data LoxInstance = LoxInstance
 instance Show LoxInstance where
   show inst = BS.unpack (lc_name (li_class inst)) ++ " instance"
 
+classCallable :: LoxClass -> LoxCallable
 classCallable klass =
   LoxCallable
     { lc_arity =
@@ -1618,25 +1621,18 @@ stmtVarDeclaration p0 = do
       p3
 
   Right (S_VAR nameTok maybeInit, p4)
-
 stmtFunction :: Parser -> BS.ByteString -> EitherStmtParser
 stmtFunction p0 kind = do
   (p1, name) <-
     parserConsume
       IDENTIFIER
-      (  "Expect "
-      <> kind
-      <> " name."
-      )
+      ("Expect " <> kind <> " name.")
       p0
 
   (p2, _) <-
     parserConsume
       LEFT_PAREN
-      (  "Expect '(' after "
-      <> kind
-      <> " name."
-      )
+      ("Expect '(' after " <> kind <> " name.")
       p1
 
   (p3, params) <-
@@ -1646,7 +1642,7 @@ stmtFunction p0 kind = do
         (pFirst, firstParam) <-
           parserConsume IDENTIFIER "Expect parameter name." p2
 
-        (pRest, moreParams) <- loop pFirst 1 [firstParam]
+        (pRest, moreParams) <- loop pFirst (1 :: Int) [firstParam]
 
         Right (pRest, moreParams)
 
@@ -1659,34 +1655,34 @@ stmtFunction p0 kind = do
   (p5, _) <-
     parserConsume
       LEFT_BRACE
-      (  "Expect '{' before "
-      <> kind
-      <> " body."
-      )
+      ("Expect '{' before " <> kind <> " body.")
       p4
 
   (body, p6) <- stmtBlock p5
   Right (S_FUNCTION name params body, p6)
 
   where
-     loop p0 len acc
-      | (True, p1) <- parserMatch [COMMA] p0
+    loop :: Parser -> Int -> [Token] -> Either BS.ByteString (Parser, [Token])
+    loop pIn len acc
+      | (True, pComma) <- parserMatch [COMMA] pIn
           = if len >= 255
               then
                 Left $
-                 loxError
-                  (t_line $ parserPeek p1)
-                  "Can't have more than 255 parameters."
+                  loxError
+                    (t_line $ parserPeek pComma)
+                    "Can't have more than 255 parameters."
               else do
-                (p2, name) <-
+                (pNext, nameTok) <-
                   parserConsume
                     IDENTIFIER
-                    "Expect parameter name"
-                    p1
+                    "Expect parameter name."
+                    pComma
 
-                loop p2 (len + 1) (name : acc)
+                loop pNext (len + 1) (nameTok : acc)
 
-      | otherwise = Right (p0, reverse acc)
+      | otherwise =
+          Right (pIn, reverse acc)
+
 
 stmtClassDeclaration :: Parser -> EitherStmtParser
 stmtClassDeclaration p0 = do
@@ -1720,8 +1716,8 @@ stmtClassDeclaration p0 = do
         if parserCheck p RIGHT_BRACE || parserIsAtEnd p
           then Right (reverse acc, p)
           else do
-            (method, p1) <- stmtFunction p "method"
-            loop p1 (method : acc)
+            (method, p') <- stmtFunction p "method"
+            loop p' (method : acc)
 
   (methods, p5) <- loop p4 []
 
@@ -1785,11 +1781,10 @@ execBlock interp0 = go interp1
       (outs1, res1) <- stmtExec interp s
       let acc' = acc ++ outs1
       case res1 of
-        ER_NORMAL interp1   -> go interp1 acc' ss
-        ER_BREAK  interp1   -> Right (acc', ER_BREAK interp1)
-        ER_CONTINUE interp1 -> Right (acc', ER_CONTINUE interp1)
-        ER_RETURN lit interp1 ->
-          Right (acc', ER_RETURN lit interp1)
+        ER_NORMAL interp'   -> go interp' acc' ss
+        ER_BREAK  interp'   -> Right (acc', ER_BREAK interp')
+        ER_CONTINUE interp' -> Right (acc', ER_CONTINUE interp')
+        ER_RETURN lit interp' -> Right (acc', ER_RETURN lit interp')
 
 -- stmtExec
 -- add new one when adding to Stmt
@@ -1881,9 +1876,9 @@ stmtExec interp0 (S_WHILE cond body) =
             ER_RETURN litR interp2 ->
               Right (acc1, ER_RETURN litR interp2)
 
-stmtExec interp0 (S_FOR init cond inc body) = do
+stmtExec interp0 (S_FOR initialize cond inc body) = do
   (outsInit, resInit) <-
-    case init of
+    case initialize of
       Nothing   -> Right ([], ER_NORMAL interp0)
       Just stmt -> stmtExec interp0 stmt
 
@@ -1975,7 +1970,7 @@ stmtExec interp0 (S_CLASS name super methods) = do
       pure Nothing
 
     Just (E_VARIABLE superTok) -> do
-      (outs, val, interp2) <- exprEval interp1 (E_VARIABLE superTok)
+      (_, val, _) <- exprEval interp1 (E_VARIABLE superTok)
       case val of
         L_CLASS klass -> do
           let LoxClass superName _ _ = klass
@@ -2171,27 +2166,27 @@ interpRun
   -> ([BS.ByteString], Parser, Interpreter)
 interpRun env p0 = go env p0 []
   where
-    go env p acc
-      | parserIsAtEnd p = (acc, p, env)
+    go env' p acc
+      | parserIsAtEnd p = (acc, p, env')
       | otherwise =
           case stmtDeclaration p of
             Left err ->
               let pSync = synchronize p
-              in (acc ++ [err], pSync, env)
+              in (acc ++ [err], pSync, env')
 
             Right (stmt, p1) ->
-              case stmtExec env stmt of
+              case stmtExec env' stmt of
                 Left err ->
-                  (acc ++ [err], p1, env)
+                  (acc ++ [err], p1, env')
 
                 Right (outs, res) ->
-                  let env' =
+                  let env'' =
                         case res of
                           ER_NORMAL e    -> e
                           ER_BREAK e     -> e
                           ER_CONTINUE e  -> e
                           ER_RETURN _ e  -> e
-                  in go env' p1 (acc ++ outs)
+                  in go env'' p1 (acc ++ outs)
 
 run :: Interpreter -> String -> IO (Interpreter, [BS.ByteString])
 run interp source = do
