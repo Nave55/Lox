@@ -2,14 +2,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Data.List (dropWhileEnd)
-import Numeric (showFFloat)
-import Data.Maybe (fromMaybe)
-import System.IO (hFlush, stdout)
-import System.Environment (getArgs)
-import System.IO.Unsafe (unsafePerformIO)
+import Data.List             (dropWhileEnd)
+import Numeric               (showFFloat)
+import Data.Maybe            (fromMaybe)
+import System.IO             (hFlush, stdout)
+import System.Environment    (getArgs)
+import System.IO.Unsafe      (unsafePerformIO)
 import Data.Time.Clock.POSIX (getPOSIXTime)
-import Data.Char (isDigit, isAlpha, isAlphaNum)
+import Data.Char             (isDigit, isAlpha, isAlphaNum)
 
 import qualified Data.Map.Strict       as SM
 import qualified Data.ByteString.Char8 as BS
