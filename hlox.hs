@@ -191,13 +191,13 @@ scannerInit s_source line =
     }
 
 loxValueShow :: LoxValue -> BS.ByteString
-loxValueShow (L_NUMBER n) = formatNum n 10
-loxValueShow (L_STRING s) = s
-loxValueShow (L_BOOL b)   = if b then "true" else "false"
-loxValueShow L_NIL        = "nil"
-loxValueShow (L_FUN _)   = "<fn>"
-loxValueShow (L_CALL _)   = "<native fn>"
-loxValueShow (L_CLASS klass)  = lc_name klass
+loxValueShow (L_NUMBER n)      = formatNum n 10
+loxValueShow (L_STRING s)      = s
+loxValueShow (L_BOOL b)        = if b then "true" else "false"
+loxValueShow L_NIL             = "nil"
+loxValueShow (L_FUN _)         = "<fn>"
+loxValueShow (L_CALL _)        = "<native fn>"
+loxValueShow (L_CLASS klass)   = lc_name klass
 loxValueShow (L_INSTANCE inst) = BS.pack (show inst)
 
 data LocField = LocCurr | LocLine
@@ -1439,10 +1439,8 @@ stmtFunction p0 kind = do
       | (True, pComma) <- parserMatch [COMMA] pIn
           = if len >= 255
               then
-                Left $
-                  loxError
-                    (t_line $ parserPeek pComma)
-                    "Can't have more than 255 parameters."
+                Left $ loxError (t_line $ parserPeek pComma)
+                  "Can't have more than 255 parameters."
               else do
                 (pNext, nameTok) <- parserConsume IDENTIFIER "Expect parameter name." pComma
                 loop pNext (len + 1) (nameTok : acc)
