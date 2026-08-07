@@ -594,8 +594,7 @@ synchronize = go . parserAdvance
       | t_type (parserPeek parser) `elem` syncStarters = parser
       | otherwise = go (parserAdvance parser)
 
-    syncStarters =
-      [ CLASS, FUN, VAR, FOR, IF, WHILE, PRINT, RETURN ]
+    syncStarters = [ CLASS, FUN, VAR, FOR, IF, WHILE, PRINT, RETURN ]
 
 data BinaryOrLogical = Binary | Logical
   deriving (Eq)
@@ -1126,7 +1125,12 @@ exprEval interp (E_THIS tok) = do
 exprEval interp0 (E_SUPER superTok methodTok) = do
   let env = i_environment interp0
 
-  superVal <- envGet env superTok
+  superVal <- case envGet env superTok of
+          Right v -> pure v
+          Left _  ->
+              Left (loxError (t_line superTok)
+                  "Cannot use 'super' here: no superclass in this context.")
+
   klass    <- case superVal of
     L_CLASS k -> pure k
     _         -> Left (loxError (t_line superTok) "'super' is not a class")
