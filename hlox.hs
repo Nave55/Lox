@@ -1912,10 +1912,7 @@ builtIns =
 --                                    Run
 ---------------------------------------------------------------------------------------
 
-interpRun
-  :: Interpreter
-  -> Parser
-  -> ([BS.ByteString], Parser, Interpreter)
+interpRun :: Interpreter -> Parser -> ([BS.ByteString], Parser, Interpreter)
 interpRun env p0 = go env p0 []
   where
     go env' p acc
@@ -1946,8 +1943,7 @@ run interp source = do
       sc1 = scannerRun sc0
 
   case s_errors sc1 of
-    errs@(_:_) ->
-      pure (interp, errs)
+    errs@(_:_) -> pure (interp, errs)
 
     [] -> do
       let parser0 = createParser (s_tokens sc1)
