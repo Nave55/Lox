@@ -18,22 +18,19 @@ import qualified Data.ByteString.Char8 as BS
 --                             Type Aliases
 ---------------------------------------------------------------------------
 
-type EitherLit             = Either BS.ByteString LoxValue
-type EitherEnv             = Either BS.ByteString Env
-type EitherParserTok       = Either BS.ByteString (Parser, Token)
-type EitherStmtParser      = Either BS.ByteString (Stmt, Parser)
-type EitherExprParser      = Either BS.ByteString (Expr, Parser)
-type EitherLoxCallable     = Either BS.ByteString LoxCallable
-type EitherListBsExecRes   = Either BS.ByteString ([BS.ByteString], ExecResult)
-type EitherListStmtParser  = Either BS.ByteString ([Stmt], Parser)
-type EitherListBsLitInterp = Either BS.ByteString ([BS.ByteString], LoxValue, Interpreter)
+type EitherEnv                  = Either BS.ByteString Env
+type EitherLoxValue             = Either BS.ByteString LoxValue
+type EitherParserTok            = Either BS.ByteString (Parser, Token)
+type EitherStmtParser           = Either BS.ByteString (Stmt, Parser)
+type EitherExprParser           = Either BS.ByteString (Expr, Parser)
+type EitherLoxCallable          = Either BS.ByteString LoxCallable
+type EitherListBsExecRes        = Either BS.ByteString ([BS.ByteString], ExecResult)
+type EitherListStmtParser       = Either BS.ByteString ([Stmt], Parser)
+type EitherListBsLoxValueInterp = Either BS.ByteString ([BS.ByteString], LoxValue, Interpreter)
 
 ---------------------------------------------------------------------------
 --                            Helper Functions
 ---------------------------------------------------------------------------
-
-loxError :: Int -> BS.ByteString -> BS.ByteString
-loxError line = loxReport line ""
 
 loxReport :: Int -> BS.ByteString -> BS.ByteString -> BS.ByteString
 loxReport line loc msg =
@@ -43,6 +40,9 @@ loxReport line loc msg =
     <> loc
     <> "-> "
     <> msg
+
+loxError :: Int -> BS.ByteString -> BS.ByteString
+loxError line = loxReport line ""
 
 sliceBs :: Int -> Int -> BS.ByteString -> BS.ByteString
 sliceBs i j bs = BS.take (j - i) (BS.drop i bs)
@@ -134,7 +134,7 @@ instance Show LoxValue where
   show (L_STRING s)      = show s
   show (L_BOOL b)        = show b
   show L_NIL             = "nil"
-  show (L_FUN _)        = "<fn>"
+  show (L_FUN _)         = "<fn>"
   show (L_CALL _)        = "<native fn>"
   show (L_CLASS c)       = "<class " ++ BS.unpack (lc_name c) ++ ">"
   show (L_INSTANCE inst) =
@@ -152,10 +152,10 @@ instance Eq LoxValue where
   _ == _ = False
 
 data Token = Token
-  { t_type    :: TokenType
-  , t_lexeme  :: BS.ByteString
-  , t_literal :: Maybe LoxValue
-  , t_line    :: Int
+  { t_type     :: TokenType
+  , t_lexeme   :: BS.ByteString
+  , t_loxValue :: Maybe LoxValue
+  , t_line     :: Int
   }
   deriving (Show)
 
@@ -174,39 +174,39 @@ data Scanner = Scanner
   }
   deriving (Show)
 
-createToken :: TokenType -> BS.ByteString -> Maybe LoxValue -> Int -> Token
-createToken t_type t_lexeme t_literal t_line =
-  Token { t_type, t_lexeme, t_literal, t_line }
+tokenCreate :: TokenType -> BS.ByteString -> Maybe LoxValue -> Int -> Token
+tokenCreate t_type t_lexeme t_loxValue t_line =
+  Token { t_type, t_lexeme, t_loxValue, t_line }
 
-initLoc :: Int -> Loc
-initLoc l = Loc { l_start = 0, l_curr = 0, l_line = l }
+locInit :: Int -> Loc
+locInit l = Loc { l_start = 0, l_curr = 0, l_line = l }
 
-initScanner :: String -> Int -> Scanner
-initScanner s_source line =
+scannerInit :: String -> Int -> Scanner
+scannerInit s_source line =
   Scanner
     { s_source = BS.pack s_source
     , s_tokens = []
-    , s_loc    = initLoc line
+    , s_loc    = locInit line
     , s_errors = []
     }
 
-showLiteral :: LoxValue -> BS.ByteString
-showLiteral (L_NUMBER n) = formatNum n 10
-showLiteral (L_STRING s) = s
-showLiteral (L_BOOL b)   = if b then "true" else "false"
-showLiteral L_NIL        = "nil"
-showLiteral (L_FUN _)   = "<fn>"
-showLiteral (L_CALL _)   = "<native fn>"
-showLiteral (L_CLASS klass)  = lc_name klass
-showLiteral (L_INSTANCE inst) = BS.pack (show inst)
+loxValueShow :: LoxValue -> BS.ByteString
+loxValueShow (L_NUMBER n) = formatNum n 10
+loxValueShow (L_STRING s) = s
+loxValueShow (L_BOOL b)   = if b then "true" else "false"
+loxValueShow L_NIL        = "nil"
+loxValueShow (L_FUN _)   = "<fn>"
+loxValueShow (L_CALL _)   = "<native fn>"
+loxValueShow (L_CLASS klass)  = lc_name klass
+loxValueShow (L_INSTANCE inst) = BS.pack (show inst)
 
 data LocField = LocCurr | LocLine
-updateLoc :: (Int -> Int) -> Scanner -> LocField -> Scanner
-updateLoc f sc LocCurr =
+locUpdate :: (Int -> Int) -> Scanner -> LocField -> Scanner
+locUpdate f sc LocCurr =
   let loc = s_loc sc
   in sc { s_loc = loc { l_curr = f (l_curr loc) } }
 
-updateLoc f sc LocLine =
+locUpdate f sc LocLine =
   let loc = s_loc sc
   in sc { s_loc = loc { l_line = f (l_line loc) } }
 
@@ -242,7 +242,7 @@ scannerIsAtEnd sc = l_curr (s_loc sc) >= scannerSourceLen sc
 scannerAdvance :: Scanner -> (Scanner, Char)
 scannerAdvance sc0 =
   let c   = charAtScannerCur sc0
-      sc1 = updateLoc (+1) sc0 LocCurr
+      sc1 = locUpdate (+1) sc0 LocCurr
   in (sc1, c)
 
 scannerPeek :: Scanner -> Char
@@ -255,33 +255,29 @@ scannerPeekNext sc
   | n_loc >= BS.length (s_source sc) = '\0'
   | otherwise = BS.index (s_source sc) n_loc
 
-  where
-    n_loc = l_curr (s_loc sc) + 1
+  where n_loc = l_curr (s_loc sc) + 1
 
 scannerMatch :: Scanner -> Char -> (Scanner, Bool)
 scannerMatch sc expected
   | scannerIsAtEnd sc = (sc, False)
   | charAtScannerCur sc /= expected = (sc, False)
-  | otherwise = (updateLoc (+1) sc LocCurr, True)
+  | otherwise = (locUpdate (+1) sc LocCurr, True)
 
-scannerAddTokenWithLiteral :: TokenType -> Maybe LoxValue -> Scanner -> Scanner
-scannerAddTokenWithLiteral t_type literal sc =
+scannerAddTokenWithLoxVal :: TokenType -> Maybe LoxValue -> Scanner -> Scanner
+scannerAddTokenWithLoxVal t_type loxVal sc =
   let text  = sliceScannerStartCurrent sc
-      token = createToken t_type text literal (l_line $ s_loc sc)
+      token = tokenCreate t_type text loxVal (l_line $ s_loc sc)
   in sc { s_tokens = token : s_tokens sc }
 
 scannerAddToken :: TokenType -> Scanner -> Scanner
-scannerAddToken t_type =
-  scannerAddTokenWithLiteral t_type Nothing
-
--- scan functions
+scannerAddToken t_type = scannerAddTokenWithLoxVal t_type Nothing
 
 scanForSlashes :: Scanner -> Scanner
 scanForSlashes sc0 =
   let (sc1, matched) = scannerMatch sc0 '/'
   in if matched
        then consumeComment sc1
-       else scannerAddTokenWithLiteral SLASH Nothing sc0
+       else scannerAddTokenWithLoxVal SLASH Nothing sc0
   where
     consumeComment sc =
       let c = scannerPeek sc
@@ -295,7 +291,7 @@ scanForStrings sc0
   | scannerPeek sc0 /= '"' && not (scannerIsAtEnd sc0) =
       let sc1 =
             if scannerPeek sc0 == '\n'
-              then updateLoc (+1) sc0 LocLine
+              then locUpdate (+1) sc0 LocLine
               else sc0
           (sc2, _) = scannerAdvance sc1
       in scanForStrings sc2
@@ -308,7 +304,7 @@ scanForStrings sc0
       let (sc1, _) = scannerAdvance sc0
           val      = sliceStartScannerCurrentOff sc1 1 (-1)
           lit      = Just (L_STRING val)
-      in scannerAddTokenWithLiteral STRING lit sc1
+      in scannerAddTokenWithLoxVal STRING lit sc1
 
 scanForNumbers :: Scanner -> Scanner
 scanForNumbers sc0 =
@@ -321,7 +317,7 @@ scanForNumbers sc0 =
 
       sc3 = consumeDigits sc2
   in
-    scannerAddTokenWithLiteral NUMBER (parseSourceToDouble sc3) sc3
+    scannerAddTokenWithLoxVal NUMBER (parseSourceToDouble sc3) sc3
 
   where
     consumeDigits sc
@@ -388,7 +384,7 @@ scanToken sc0 =
         ' '  -> sc1
         '\r' -> sc1
         '\t' -> sc1
-        '\n' -> updateLoc (+1) sc1 LocLine
+        '\n' -> locUpdate (+1) sc1 LocLine
 
         -- 1-2 chars
         '+'  ->
@@ -434,7 +430,7 @@ scanToken sc0 =
 scanTokens :: Scanner -> Scanner
 scanTokens sc0
   | scannerIsAtEnd sc0 =
-      let eofTok   = createToken EOF BS.empty Nothing (l_line $ s_loc sc0)
+      let eofTok   = tokenCreate EOF BS.empty Nothing (l_line $ s_loc sc0)
           sc1 = sc0 { s_tokens = eofTok : s_tokens sc0 }
       in check $ reverseTokensErrorsFromScanner sc1
 
@@ -444,7 +440,7 @@ scanTokens sc0
       in scanTokens sc2
 
   where
-    initToken = createToken EOF "" Nothing 1
+    initToken = tokenCreate EOF "" Nothing 1
     check sc' = checkBraces (s_tokens sc') sc' (initToken, 0) (initToken, 0)
     -- checks for even amt of braces and parens
     checkBraces :: [Token] -> Scanner -> (Token, Int) -> (Token, Int) -> Scanner
@@ -505,7 +501,7 @@ prettyPrintToken token = do
   putStrLn "Token: "
   putStrLn $ "  type    = " ++ show (t_type token)
   putStrLn $ "  lexeme  = " ++ show (t_lexeme token)
-  putStrLn $ "  literal = " ++ show (t_literal token)
+  putStrLn $ "  value   = " ++ show (t_loxValue token)
   putStrLn $ "  line    = " ++ show (t_line token)
 
 data PpScanOp = PpErrors | PpTokens | PpTokensSource | PpTokensErrors | PpAll
@@ -549,8 +545,7 @@ data Expr
 --                               Parser
 -----------------------------------------------------------------------------
 
--- Parser Tokens Prev Curr
-data Parser = Parser [Token] Token Token
+data Parser = Parser [Token] Token Token   -- Parser Tokens Prev Curr
   deriving (Show)
 
 createParser :: [Token] -> Parser
@@ -640,26 +635,26 @@ data Env = Env
   }
   deriving (Show)
 
-initEnv :: Env
-initEnv = Env
+envInit :: Env
+envInit = Env
   { e_map        = SM.empty
   , e_enclosing  = Nothing
   , e_loop_depth = 0
   }
 
-newEnv :: Env -> Env
-newEnv parent =
+envNew :: Env -> Env
+envNew parent =
   Env
     { e_map        = SM.empty
     , e_enclosing  = Just parent
     , e_loop_depth = e_loop_depth parent
     }
 
-enterLoop :: Env -> Env
-enterLoop env = env { e_loop_depth = e_loop_depth env + 1 }
+envLoopEnter :: Env -> Env
+envLoopEnter env = env { e_loop_depth = e_loop_depth env + 1 }
 
-exitLoop :: Env -> Env
-exitLoop env = env { e_loop_depth = e_loop_depth env - 1 }
+envLoopExit :: Env -> Env
+envLoopExit env = env { e_loop_depth = e_loop_depth env - 1 }
 
 envDefine :: Env -> BS.ByteString -> LoxValue -> Env
 envDefine env key val =
@@ -684,7 +679,7 @@ envAssign env name val =
            Nothing ->
              Left (loxError line ("Undefined variable '" <> key <> "'."))
 
-envGet :: Env -> Token -> EitherLit
+envGet :: Env -> Token -> EitherLoxValue
 envGet env token =
   let key  = t_lexeme token
       line = t_line token
@@ -708,7 +703,7 @@ data Interpreter = Interpreter
 
 data LoxCallable = LoxCallable
   { lc_arity :: Int
-  , lc_call  :: Interpreter -> Token -> [LoxValue] -> EitherListBsLitInterp
+  , lc_call  :: Interpreter -> Token -> [LoxValue] -> EitherListBsLoxValueInterp
   }
 
 data LoxFunction = LoxFunction
@@ -720,16 +715,16 @@ data LoxFunction = LoxFunction
   }
   deriving (Show)
 
-initInterpreter :: Interpreter
-initInterpreter =
+interpreterInit :: Interpreter
+interpreterInit =
   let
-    g0 = initEnv
+    g0 = envInit
     g1 = foldl' (\env (name, fn) -> envDefine env name (L_CALL fn)) g0 builtIns
   in
     Interpreter { i_globals = g1, i_environment = g1 }
 
-newLoxFunction :: Token -> [Token] -> [Stmt] -> Env -> Bool -> LoxFunction
-newLoxFunction name params body closure isInit =
+loxFunctionNew :: Token -> [Token] -> [Stmt] -> Env -> Bool -> LoxFunction
+loxFunctionNew name params body closure isInit =
   LoxFunction { lf_name = name
               , lf_params = params
               , lf_body = body
@@ -737,14 +732,14 @@ newLoxFunction name params body closure isInit =
               , lf_initializer = isInit
               }
 
-callUserFunction :: LoxFunction -> Interpreter -> Token -> [LoxValue] -> EitherListBsLitInterp
+callUserFunction :: LoxFunction -> Interpreter -> Token -> [LoxValue] -> EitherListBsLoxValueInterp
 callUserFunction fn interp0 _ args = do
   let callerEnv = i_environment interp0
       closure   = lf_closure fn
       params    = lf_params fn
       body      = lf_body fn
       isInit    = lf_initializer fn
-      callEnv0  = newEnv closure
+      callEnv0  = envNew closure
       callEnv1  =
         foldl'
           (\env (paramTok, argVal) -> envDefine env (t_lexeme paramTok) argVal)
@@ -917,7 +912,7 @@ parsePrimary p0
   | (True, p1) <- parserMatch [NIL] p0 = Right (E_LITERAL Nothing, p1)
 
   | (True, p1) <- parserMatch [NUMBER, STRING] p0
-      = case t_literal (parserPrevious p1) of
+      = case t_loxValue (parserPrevious p1) of
         Just lit -> Right (E_LITERAL (Just lit), p1)
         Nothing  -> Left "Expected literal"
 
@@ -957,7 +952,7 @@ exprIsEqual a b
   | a == L_NIL = False
   | otherwise = a == b
 
-exprUnary :: Token -> LoxValue -> EitherLit
+exprUnary :: Token -> LoxValue -> EitherLoxValue
 exprUnary op lit =
   let line = t_line op
   in case t_type op of
@@ -969,7 +964,7 @@ exprUnary op lit =
     BANG -> Right (L_BOOL (not $ exprIsTruthy lit))
     _    -> Left $ loxError line "Unknown unary operator " <> t_lexeme op
 
-exprBinary :: LoxValue -> Token -> LoxValue -> EitherLit
+exprBinary :: LoxValue -> Token -> LoxValue -> EitherLoxValue
 exprBinary left op right =
   let line   = t_line op
       tt     = t_type op
@@ -999,14 +994,14 @@ exprBinary left op right =
         _ ->
           Left (loxError line
                 ("Invalid Binary Operation ("
-                 <> showLiteral left
+                 <> loxValueShow left
                  <> " "
                  <> lexeme
                  <> " "
-                 <> showLiteral right
+                 <> loxValueShow right
                  <> ")"))
 
-exprEval :: Interpreter -> Expr -> EitherListBsLitInterp
+exprEval :: Interpreter -> Expr -> EitherListBsLoxValueInterp
 exprEval i (E_LITERAL (Just lit)) = Right ([], lit, i)
 exprEval i (E_LITERAL Nothing) = Right ([], L_NIL, i)
 exprEval i (E_GROUPING e) = exprEval i e
@@ -1139,7 +1134,7 @@ exprEval interp0 (E_SUPER superTok methodTok) = do
   let tokThis = Token
         { t_type    = IDENTIFIER
         , t_lexeme  = "this"
-        , t_literal = Nothing
+        , t_loxValue = Nothing
         , t_line    = t_line superTok
         }
 
@@ -1220,7 +1215,7 @@ classCallable klass =
 bindThis :: LoxFunction -> LoxInstance -> LoxFunction
 bindThis fn inst =
   let closure = lf_closure fn
-      env0    = newEnv closure
+      env0    = envNew closure
       env1    = envDefine env0 "this" (L_INSTANCE inst)
   in fn { lf_closure = env1 }
 
@@ -1519,9 +1514,9 @@ data ExecResult
 execBlock :: Interpreter -> [BS.ByteString] -> [Stmt] -> EitherListBsExecRes
 execBlock interp0 = go interp1
   where
-    env0    = i_environment interp0
-    envNew  = newEnv env0
-    interp1 = interp0 { i_environment = envNew }
+    env0  = i_environment interp0
+    env1  = envNew env0
+    interp1 = interp0 { i_environment = env1 }
 
     go interp acc [] =
       let env = i_environment interp in
@@ -1548,7 +1543,7 @@ execBlock interp0 = go interp1
 stmtExec :: Interpreter -> Stmt -> EitherListBsExecRes
 stmtExec i0 (S_PRINT expr) = do
   (outsE, lit, i1) <- exprEval i0 expr
-  let outs = outsE ++ [showLiteral lit]
+  let outs = outsE ++ [loxValueShow lit]
   Right (outs, ER_NORMAL i1)
 
 stmtExec interp0 (S_EXPRESSION expr) = do
@@ -1592,7 +1587,7 @@ stmtExec interp0 (S_WHILE cond body) =
   where
     interpStart =
       let env0 = i_environment interp0
-          env1 = enterLoop env0
+          env1 = envLoopEnter env0
       in interp0 { i_environment = env1 }
 
     loop interp accOuts = do
@@ -1601,7 +1596,7 @@ stmtExec interp0 (S_WHILE cond body) =
       if not (exprIsTruthy lit)
         then
           let env1    = i_environment interp1
-              env2    = exitLoop env1
+              env2    = envLoopExit env1
               interp2 = interp1 { i_environment = env2 }
           in Right (accOuts ++ outsCond, ER_NORMAL interp2)
 
@@ -1620,7 +1615,7 @@ stmtExec interp0 (S_WHILE cond body) =
 
             ER_BREAK interp2 ->
               let env2    = i_environment interp2
-                  env3    = exitLoop env2
+                  env3    = envLoopExit env2
                   interp3 = interp2 { i_environment = env3 }
               in Right (acc1, ER_NORMAL interp3)
 
@@ -1636,7 +1631,7 @@ stmtExec interp0 (S_FOR initialize cond inc body) = do
   case resInit of
     ER_NORMAL interp1 ->
       let env1 = i_environment interp1
-          env2 = enterLoop env1
+          env2 = envLoopEnter env1
           interpStart = interp1 { i_environment = env2 }
       in loop interpStart outsInit
 
@@ -1654,7 +1649,7 @@ stmtExec interp0 (S_FOR initialize cond inc body) = do
       if not (exprIsTruthy condVal)
         then
           let envC    = i_environment interpCond
-              envE    = exitLoop envC
+              envE    = envLoopExit envC
               interpE = interpCond { i_environment = envE }
           in Right (accOuts ++ outsCond, ER_NORMAL interpE)
 
@@ -1685,7 +1680,7 @@ stmtExec interp0 (S_FOR initialize cond inc body) = do
 
             ER_BREAK interpB ->
               let envB    = i_environment interpB
-                  envE    = exitLoop envB
+                  envE    = envLoopExit envB
                   interpE = interpB { i_environment = envE }
               in Right (acc1, ER_NORMAL interpE)
 
@@ -1707,7 +1702,7 @@ stmtExec interp S_CONTINUE =
 stmtExec interp0 (S_FUNCTION name params body) =
   let env0 = i_environment interp0
       env1 = envDefine env0 (t_lexeme name) (L_FUN fn)
-      fn   = newLoxFunction name params body env1 False
+      fn   = loxFunctionNew name params body env1 False
       interp1 = interp0 { i_environment = env1 }
   in Right ([], ER_NORMAL interp1)
 
@@ -1740,7 +1735,7 @@ stmtExec interp0 (S_CLASS name super methods) = do
         pure (env1, interp1)
 
       Just superClass -> do
-        let envSuper = newEnv env1
+        let envSuper = envNew env1
             envSuper' = envDefine envSuper "super" (L_CLASS superClass)
             interpSuper = interp1 { i_environment = envSuper' }
         pure (envSuper', interpSuper)
@@ -1751,7 +1746,7 @@ stmtExec interp0 (S_CLASS name super methods) = do
              case stmt of
                S_FUNCTION fname params body ->
                  let isInit = t_lexeme fname == "init"
-                     fn     = newLoxFunction fname params body envForMethods isInit
+                     fn     = loxFunctionNew fname params body envForMethods isInit
                  in SM.insert (t_lexeme fname) fn m
                _ -> m
           )
@@ -1803,7 +1798,7 @@ builtinEcho =
     , lc_call  = \interp _ args ->
         case args of
           [lit] ->
-            let out = showLiteral lit
+            let out = loxValueShow lit
             in Right ([out], L_NIL, interp)
 
           _ -> Left "print() expects exactly 1 argument."
@@ -1850,7 +1845,7 @@ builtinToStr =
     { lc_arity = 1
     , lc_call  = \interp tok args ->
         case args of
-          [a] -> Right ([], L_STRING (showLiteral a), interp)
+          [a] -> Right ([], L_STRING (loxValueShow a), interp)
           _ -> Left $ loxError (t_line tok) "string() expects exactly 1 literal argument."
     }
 
@@ -1909,7 +1904,7 @@ interpRun env p0 = go env p0 []
 
 run :: Interpreter -> String -> IO (Interpreter, [BS.ByteString])
 run interp source = do
-  let sc0 = initScanner source 1
+  let sc0 = scannerInit source 1
       sc1 = scannerRun sc0
 
   case s_errors sc1 of
@@ -1923,7 +1918,7 @@ run interp source = do
 runFile :: FilePath -> IO ()
 runFile path = do
   bytes     <- readFile path
-  (_, outs) <- run initInterpreter bytes
+  (_, outs) <- run interpreterInit bytes
   mapM_ BS.putStrLn outs
 
 runPrompt :: IO ()
@@ -1931,14 +1926,14 @@ runPrompt = do
   putStrLn "-----------------------------------------"
   putStrLn "                 LOX REPL                "
   putStrLn "-----------------------------------------"
-  loop initInterpreter
+  loop interpreterInit
   where
     loop interp = do
       putStr ">>> "
       hFlush stdout
       line <- getLine
 
-      if line == "exit"
+      if line == ":q" || line == "exit"
         then pure ()
         else do
           (interp', outs) <- run interp line
