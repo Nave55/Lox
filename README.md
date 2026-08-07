@@ -6,7 +6,7 @@ Implementation of Lox from the book **Crafting Interpreters**
 ## Projects
 
 - **hlox** – jLox tree-walking interpreter implemented in **Haskell**
-- **olox** – cLox VM interpreter implemented in **Odin**
+- **olox** – cLox Byte Code interpreter implemented in **Odin**
 
 ## Progress
 
