@@ -1447,7 +1447,6 @@ stmtFunction p0 kind = do
 
       | otherwise = Right (pIn, reverse acc)
 
-
 stmtClassDeclaration :: Parser -> EitherStmtParser
 stmtClassDeclaration p0 = do
   (p1, nameTok) <- parserConsume IDENTIFIER "Expect class name." p0
