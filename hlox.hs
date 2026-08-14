@@ -1513,6 +1513,12 @@ data ExecResult
   | ER_CONTINUE Interpreter
   | ER_RETURN   LoxValue Interpreter
 
+execResultExtractInterp :: ExecResult -> Interpreter
+execResultExtractInterp (ER_NORMAL i) = i
+execResultExtractInterp (ER_BREAK i) = i
+execResultExtractInterp (ER_CONTINUE i) = i
+execResultExtractInterp (ER_RETURN _ i) = i
+
 execBlock :: Interpreter -> [BS.ByteString] -> [Stmt] -> EitherListBsExecRes
 execBlock interp0 = go interp1
   where
@@ -1567,8 +1573,7 @@ stmtExec interp0 (S_VAR name maybeInit) =
           interp2 = interp1 { i_environment = env2 }
       Right (outs, ER_NORMAL interp2)
 
-stmtExec interp0 (S_BLOCK stmts) =
-  execBlock interp0 [] stmts
+stmtExec interp0 (S_BLOCK stmts) = execBlock interp0 [] stmts
 
 stmtExec interp0 (S_IF cond tb eb) = do
   (outsCond, lit, interp1) <- exprEval interp0 cond
@@ -1906,16 +1911,10 @@ run interp source = do
 
                 Right (stmt, p1) ->
                   case stmtExec env' stmt of
-                    Left err ->
-                      (acc ++ [err], p1, env')
+                    Left err -> (acc ++ [err], p1, env')
 
                     Right (outs, res) ->
-                      let env'' =
-                            case res of
-                              ER_NORMAL e    -> e
-                              ER_BREAK e     -> e
-                              ER_CONTINUE e  -> e
-                              ER_RETURN _ e  -> e
+                      let env'' = execResultExtractInterp res
                       in go env'' p1 (acc ++ outs)
 
 runFile :: FilePath -> IO ()
