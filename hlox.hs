@@ -229,12 +229,10 @@ scannerSourceLen :: Scanner -> Int
 scannerSourceLen sc = BS.length $ s_source sc
 
 charAtScannerCur :: Scanner -> Char
-charAtScannerCur sc =
-  BS.index (s_source sc) (l_curr $ s_loc sc)
+charAtScannerCur sc = BS.index (s_source sc) (l_curr $ s_loc sc)
 
 charAtScannerCurOff :: Scanner -> Int -> Char
-charAtScannerCurOff sc off =
-  BS.index (s_source sc) (l_curr (s_loc sc) + off)
+charAtScannerCurOff sc off = BS.index (s_source sc) (l_curr (s_loc sc) + off)
 
 scannerIsAtEnd :: Scanner -> Bool
 scannerIsAtEnd sc = l_curr (s_loc sc) >= scannerSourceLen sc
@@ -309,7 +307,6 @@ scanForStrings sc0
 scanForNumbers :: Scanner -> Scanner
 scanForNumbers sc0 =
   let sc1 = consumeDigits sc0
-
       sc2 =
         if scannerPeek sc1 == '.' && isDigit (scannerPeekNext sc1)
           then fst (scannerAdvance sc1)
@@ -522,9 +519,9 @@ prettyPrintScanner sc PpAll = do
   mapM_ prettyPrintToken (s_tokens sc)
   mapM_ BS.putStrLn (s_errors sc)
 
---------------------------------------------------------------------------------
---                                 Expressions
---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------
+--                                  Expressions
+---------------------------------------------------------------------------------------
 
 data Expr
   = E_ASSIGN   Token Expr          -- name value
@@ -541,87 +538,24 @@ data Expr
   | E_VARIABLE Token               -- name
   deriving (Show)
 
------------------------------------------------------------------------------
---                               Parser
------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------
+--                                    Statements
+---------------------------------------------------------------------------------------
 
-data Parser = Parser [Token] Token Token   -- Parser Tokens Prev Curr
+data Stmt
+  = S_BLOCK      [Stmt]                                       -- statements
+  | S_CLASS      Token (Maybe Expr) [Stmt]                    -- name, superclass, methods
+  | S_EXPRESSION Expr                                         -- expression
+  | S_FUNCTION   Token [Token] [Stmt]                         -- name params body
+  | S_IF         Expr Stmt (Maybe Stmt)                       -- condition thenBranch elseBranch
+  | S_PRINT      Expr                                         -- expression
+  | S_RETURN     Token (Maybe Expr)                           -- keyword value
+  | S_VAR        Token (Maybe Expr)                           -- name initializer
+  | S_WHILE      Expr Stmt                                    -- condition body
+  | S_FOR        (Maybe Stmt) (Maybe Expr) (Maybe Expr) Stmt  -- init cond inc body
+  | S_BREAK
+  | S_CONTINUE
   deriving (Show)
-
-createParser :: [Token] -> Parser
-createParser [] = error "createParser requires a non empty list"
-createParser (x:xs) =
-  let dummy = Token EOF "" Nothing (t_line x)
-  in Parser xs dummy x
-
-parserPeek :: Parser -> Token
-parserPeek (Parser _ _ cur) = cur
-
-parserPrevious :: Parser -> Token
-parserPrevious (Parser _ prev _) = prev
-
-parserIsAtEnd :: Parser -> Bool
-parserIsAtEnd p = t_type (parserPeek p) == EOF
-
-parserAdvance :: Parser -> Parser
-parserAdvance (Parser [] _ _) = error "parserAdvance requires a non empty list"
-parserAdvance (Parser (t:ts) _ cur) = Parser ts cur t
-
-parserCheck :: Parser -> TokenType -> Bool
-parserCheck parser tt = not (parserIsAtEnd parser) && (t_type (parserPeek parser) == tt)
-
-parserMatch :: [TokenType] -> Parser -> (Bool, Parser)
-parserMatch [] p = (False, p)
-parserMatch (t:ts) p
-  | parserCheck p t = (True, parserAdvance p)
-  | otherwise       = parserMatch ts p
-
-parserConsume :: TokenType -> BS.ByteString -> Parser -> EitherParserTok
-parserConsume tt msg p
-  | parserCheck p tt =
-      let p1 = parserAdvance p
-      in Right (p1, parserPrevious p1)
-  | otherwise =
-      let c = parserPeek p
-      in Left (loxError (t_line c) msg)
-
-synchronize :: Parser -> Parser
-synchronize = go . parserAdvance
-  where
-    go parser
-      | parserIsAtEnd parser = parser
-      | t_type (parserPrevious parser) == SEMICOLON = parser
-      | t_type (parserPeek parser) `elem` syncStarters = parser
-      | otherwise = go (parserAdvance parser)
-
-    syncStarters = [ CLASS, FUN, VAR, FOR, IF, WHILE, PRINT, RETURN ]
-
-data BinaryOrLogical = Binary | Logical
-  deriving (Eq)
-
-parserMatchRest
-  :: Expr
-  -> Parser
-  -> [TokenType]
-  -> (Parser -> EitherExprParser)
-  -> BinaryOrLogical
-  -> EitherExprParser
-parserMatchRest expr parser tokens func bl =
-  let (matched, parser1) = parserMatch tokens parser
-  in if matched
-     then do
-       let operator = parserPrevious parser1
-       (right, parser2) <- func parser1
-
-       let expr1 =
-            if bl == Binary
-              then E_BINARY expr operator right
-              else E_LOGICAL expr operator right
-
-       parserMatchRest expr1 parser2 tokens func bl
-
-     else
-       Right (expr, parser1)
 
 ----------------------------------------------------------------------------------------
 --                                  Environments
@@ -689,6 +623,22 @@ envGet env token =
            Just parent -> envGet parent token
            Nothing ->
              Left (loxError line ("Undefined variable '" <> key <> "'."))
+
+-------------------------------------------------------------------------------------------
+--                                   ExecResult 
+-------------------------------------------------------------------------------------------
+
+data ExecResult
+  = ER_NORMAL   Interpreter
+  | ER_BREAK    Interpreter
+  | ER_CONTINUE Interpreter
+  | ER_RETURN   LoxValue Interpreter
+
+execResultExtractInterp :: ExecResult -> Interpreter
+execResultExtractInterp (ER_NORMAL i) = i
+execResultExtractInterp (ER_BREAK i) = i
+execResultExtractInterp (ER_CONTINUE i) = i
+execResultExtractInterp (ER_RETURN _ i) = i
 
 -------------------------------------------------------------------------------------------
 --                                   Interpreter 
@@ -785,6 +735,194 @@ expectCallable (L_CALL c)  = Right c
 expectCallable (L_FUN f)   = Right (wrapUserFunction f)
 expectCallable (L_CLASS k) = Right (classCallable k)
 expectCallable _           = Left "Can only call functions and classes."
+
+interpRun :: Interpreter -> String -> IO (Interpreter, [BS.ByteString])
+interpRun interp source = do
+  let sc0 = scannerInit source 1
+      sc1 = scannerRun sc0
+
+  case s_errors sc1 of
+    errs@(_:_) -> pure (interp, errs)
+
+    [] -> do
+      let parser0            = createParser (s_tokens sc1)
+          (outs, _, interp1) = loop interp parser0
+      pure (interp1, outs)
+
+  where
+    loop :: Interpreter -> Parser -> ([BS.ByteString], Parser, Interpreter)
+    loop env p0 = go env p0 []
+      where
+        go env' p acc
+          | parserIsAtEnd p = (acc, p, env')
+          | otherwise =
+              case stmtDeclaration p of
+                Left err ->
+                  let pSync = synchronize p
+                  in (acc ++ [err], pSync, env')
+
+                Right (stmt, p1) ->
+                  case stmtExec env' stmt of
+                    Left err -> (acc ++ [err], p1, env')
+
+                    Right (outs, res) ->
+                      let env'' = execResultExtractInterp res
+                      in go env'' p1 (acc ++ outs)
+
+---------------------------------------------------------------------------------------
+--                                      Classes
+---------------------------------------------------------------------------------------
+
+data LoxClass = LoxClass
+  { lc_name    :: BS.ByteString
+  , lc_super   :: Maybe LoxClass
+  , lc_methods :: SM.Map BS.ByteString LoxFunction
+  }
+
+instance Show LoxClass where
+  show klass = BS.unpack (lc_name klass)
+
+data LoxInstance = LoxInstance
+  { li_class  :: LoxClass
+  , li_fields :: SM.Map BS.ByteString LoxValue
+  }
+
+instance Show LoxInstance where
+  show inst = BS.unpack (lc_name (li_class inst)) ++ " instance"
+
+classCallable :: LoxClass -> LoxCallable
+classCallable klass =
+  LoxCallable
+    { lc_arity =
+        case findMethod klass "init" of
+          Just fn -> length (lf_params fn)
+          Nothing -> 0
+
+    , lc_call = \interp tok args ->
+        let inst = LoxInstance klass SM.empty in
+        case findMethod klass "init" of
+          Just fn -> do
+            let bound    = bindThis fn inst
+                callable = wrapUserFunction bound
+            (outs, retLit, interp1) <- lc_call callable interp tok args
+            Right (outs, retLit, interp1)
+
+          Nothing ->
+            Right ([], L_INSTANCE inst, interp)
+    }
+
+bindThis :: LoxFunction -> LoxInstance -> LoxFunction
+bindThis fn inst =
+  let closure = lf_closure fn
+      env0    = envNew closure
+      env1    = envDefine env0 "this" (L_INSTANCE inst)
+  in fn { lf_closure = env1 }
+
+instanceGet :: LoxInstance -> Token -> Either BS.ByteString LoxValue
+instanceGet inst nameTok =
+  case SM.lookup (t_lexeme nameTok) (li_fields inst) of
+    Just v  -> Right v
+    Nothing ->
+      case findMethod (li_class inst) (t_lexeme nameTok) of
+        Just fn -> Right (L_FUN (bindThis fn inst))
+        Nothing ->
+          Left (loxError (t_line nameTok)
+                ("Undefined property '" <> t_lexeme nameTok <> "'"))
+
+instanceSet :: LoxInstance -> Token -> LoxValue -> LoxInstance
+instanceSet inst nameTok value =
+  inst { li_fields = SM.insert (t_lexeme nameTok) value (li_fields inst) }
+
+findMethod :: LoxClass -> BS.ByteString -> Maybe LoxFunction
+findMethod klass name =
+  case SM.lookup name (lc_methods klass) of
+    Just fn -> Just fn
+    Nothing ->
+      case lc_super klass of
+        Just super -> findMethod super name
+        Nothing    -> Nothing
+
+-----------------------------------------------------------------------------
+--                                PARSER
+-----------------------------------------------------------------------------
+
+data Parser = Parser [Token] Token Token   -- Parser Tokens Prev Curr
+  deriving (Show)
+
+createParser :: [Token] -> Parser
+createParser [] = error "createParser requires a non empty list"
+createParser (x:xs) =
+  let dummy = Token EOF "" Nothing (t_line x)
+  in Parser xs dummy x
+
+parserPeek :: Parser -> Token
+parserPeek (Parser _ _ cur) = cur
+
+parserPrevious :: Parser -> Token
+parserPrevious (Parser _ prev _) = prev
+
+parserIsAtEnd :: Parser -> Bool
+parserIsAtEnd p = t_type (parserPeek p) == EOF
+
+parserAdvance :: Parser -> Parser
+parserAdvance (Parser [] _ _) = error "parserAdvance requires a non empty list"
+parserAdvance (Parser (t:ts) _ cur) = Parser ts cur t
+
+parserCheck :: Parser -> TokenType -> Bool
+parserCheck parser tt = not (parserIsAtEnd parser) && (t_type (parserPeek parser) == tt)
+
+parserMatch :: [TokenType] -> Parser -> (Bool, Parser)
+parserMatch [] p = (False, p)
+parserMatch (t:ts) p
+  | parserCheck p t = (True, parserAdvance p)
+  | otherwise       = parserMatch ts p
+
+parserConsume :: TokenType -> BS.ByteString -> Parser -> EitherParserTok
+parserConsume tt msg p
+  | parserCheck p tt =
+      let p1 = parserAdvance p
+      in Right (p1, parserPrevious p1)
+  | otherwise =
+      let c = parserPeek p
+      in Left (loxError (t_line c) msg)
+
+synchronize :: Parser -> Parser
+synchronize = go . parserAdvance
+  where
+    go parser
+      | parserIsAtEnd parser = parser
+      | t_type (parserPrevious parser) == SEMICOLON = parser
+      | t_type (parserPeek parser) `elem` syncStarters = parser
+      | otherwise = go (parserAdvance parser)
+
+    syncStarters = [ CLASS, FUN, VAR, FOR, IF, WHILE, PRINT, RETURN ]
+
+data BinaryOrLogical = Binary | Logical
+  deriving (Eq)
+
+parserMatchRest
+  :: Expr
+  -> Parser
+  -> [TokenType]
+  -> (Parser -> EitherExprParser)
+  -> BinaryOrLogical
+  -> EitherExprParser
+parserMatchRest expr parser tokens func bl =
+  let (matched, parser1) = parserMatch tokens parser
+  in if matched
+     then do
+       let operator = parserPrevious parser1
+       (right, parser2) <- func parser1
+
+       let expr1 =
+            if bl == Binary
+              then E_BINARY expr operator right
+              else E_LOGICAL expr operator right
+
+       parserMatchRest expr1 parser2 tokens func bl
+
+     else
+       Right (expr, parser1)
 
 --------------------------------------------------------------------------------------
 --                               Expression parsing 
@@ -1155,97 +1293,6 @@ exprEval interp0 (E_SUPER superTok methodTok) = do
       let bound = bindThis fn inst
       pure ([], L_FUN bound, interp0)
 
----------------------------------------------------------------------------------------
---                                    Statements
----------------------------------------------------------------------------------------
-
-data Stmt
-  = S_BLOCK      [Stmt]                                       -- statements
-  | S_CLASS      Token (Maybe Expr) [Stmt]                    -- name, superclass, methods
-  | S_EXPRESSION Expr                                         -- expression
-  | S_FUNCTION   Token [Token] [Stmt]                         -- name params body
-  | S_IF         Expr Stmt (Maybe Stmt)                       -- condition thenBranch elseBranch
-  | S_PRINT      Expr                                         -- expression
-  | S_RETURN     Token (Maybe Expr)                           -- keyword value
-  | S_VAR        Token (Maybe Expr)                           -- name initializer
-  | S_WHILE      Expr Stmt                                    -- condition body
-  | S_FOR        (Maybe Stmt) (Maybe Expr) (Maybe Expr) Stmt  -- init cond inc body
-  | S_BREAK
-  | S_CONTINUE
-  deriving (Show)
-
----------------------------------------------------------------------------------------
---                                      Classes
----------------------------------------------------------------------------------------
-
-data LoxClass = LoxClass
-  { lc_name    :: BS.ByteString
-  , lc_super   :: Maybe LoxClass
-  , lc_methods :: SM.Map BS.ByteString LoxFunction
-  }
-
-instance Show LoxClass where
-  show klass = BS.unpack (lc_name klass)
-
-data LoxInstance = LoxInstance
-  { li_class  :: LoxClass
-  , li_fields :: SM.Map BS.ByteString LoxValue
-  }
-
-instance Show LoxInstance where
-  show inst = BS.unpack (lc_name (li_class inst)) ++ " instance"
-
-classCallable :: LoxClass -> LoxCallable
-classCallable klass =
-  LoxCallable
-    { lc_arity =
-        case findMethod klass "init" of
-          Just fn -> length (lf_params fn)
-          Nothing -> 0
-
-    , lc_call = \interp tok args ->
-        let inst = LoxInstance klass SM.empty in
-        case findMethod klass "init" of
-          Just fn -> do
-            let bound    = bindThis fn inst
-                callable = wrapUserFunction bound
-            (outs, retLit, interp1) <- lc_call callable interp tok args
-            Right (outs, retLit, interp1)
-
-          Nothing ->
-            Right ([], L_INSTANCE inst, interp)
-    }
-
-bindThis :: LoxFunction -> LoxInstance -> LoxFunction
-bindThis fn inst =
-  let closure = lf_closure fn
-      env0    = envNew closure
-      env1    = envDefine env0 "this" (L_INSTANCE inst)
-  in fn { lf_closure = env1 }
-
-instanceGet :: LoxInstance -> Token -> Either BS.ByteString LoxValue
-instanceGet inst nameTok =
-  case SM.lookup (t_lexeme nameTok) (li_fields inst) of
-    Just v  -> Right v
-    Nothing ->
-      case findMethod (li_class inst) (t_lexeme nameTok) of
-        Just fn -> Right (L_FUN (bindThis fn inst))
-        Nothing ->
-          Left (loxError (t_line nameTok)
-                ("Undefined property '" <> t_lexeme nameTok <> "'"))
-
-instanceSet :: LoxInstance -> Token -> LoxValue -> LoxInstance
-instanceSet inst nameTok value =
-  inst { li_fields = SM.insert (t_lexeme nameTok) value (li_fields inst) }
-
-findMethod :: LoxClass -> BS.ByteString -> Maybe LoxFunction
-findMethod klass name =
-  case SM.lookup name (lc_methods klass) of
-    Just fn -> Just fn
-    Nothing ->
-      case lc_super klass of
-        Just super -> findMethod super name
-        Nothing    -> Nothing
 
 ---------------------------------------------------------------------------------------
 --                                 Statement Parsing
@@ -1506,18 +1553,6 @@ stmtParse p0 = go p0 []
 ---------------------------------------------------------------------------------------
 --                               Statement Evaluation
 ---------------------------------------------------------------------------------------
-
-data ExecResult
-  = ER_NORMAL   Interpreter
-  | ER_BREAK    Interpreter
-  | ER_CONTINUE Interpreter
-  | ER_RETURN   LoxValue Interpreter
-
-execResultExtractInterp :: ExecResult -> Interpreter
-execResultExtractInterp (ER_NORMAL i) = i
-execResultExtractInterp (ER_BREAK i) = i
-execResultExtractInterp (ER_CONTINUE i) = i
-execResultExtractInterp (ER_RETURN _ i) = i
 
 execBlock :: Interpreter -> [BS.ByteString] -> [Stmt] -> EitherListBsExecRes
 execBlock interp0 = go interp1
@@ -1884,43 +1919,10 @@ builtIns =
 --                                    Run
 ---------------------------------------------------------------------------------------
 
-run :: Interpreter -> String -> IO (Interpreter, [BS.ByteString])
-run interp source = do
-  let sc0 = scannerInit source 1
-      sc1 = scannerRun sc0
-
-  case s_errors sc1 of
-    errs@(_:_) -> pure (interp, errs)
-
-    [] -> do
-      let parser0            = createParser (s_tokens sc1)
-          (outs, _, interp1) = interpRun interp parser0
-      pure (interp1, outs)
-
-  where
-    interpRun :: Interpreter -> Parser -> ([BS.ByteString], Parser, Interpreter)
-    interpRun env p0 = go env p0 []
-      where
-        go env' p acc
-          | parserIsAtEnd p = (acc, p, env')
-          | otherwise =
-              case stmtDeclaration p of
-                Left err ->
-                  let pSync = synchronize p
-                  in (acc ++ [err], pSync, env')
-
-                Right (stmt, p1) ->
-                  case stmtExec env' stmt of
-                    Left err -> (acc ++ [err], p1, env')
-
-                    Right (outs, res) ->
-                      let env'' = execResultExtractInterp res
-                      in go env'' p1 (acc ++ outs)
-
 runFile :: FilePath -> IO ()
 runFile path = do
   bytes     <- readFile path
-  (_, outs) <- run interpreterInit bytes
+  (_, outs) <- interpRun interpreterInit bytes
   mapM_ BS.putStrLn outs
 
 runPrompt :: IO ()
@@ -1938,7 +1940,7 @@ runPrompt = do
       if line == ":q" || line == "exit"
         then pure ()
         else do
-          (interp', outs) <- run interp line
+          (interp', outs) <- interpRun interp line
           mapM_ BS.putStrLn outs
           loop interp'
 
@@ -1953,4 +1955,3 @@ main = do
     []  -> runPrompt
     [p] -> runFile p
     _   -> putStrLn "Too many args. More than 1 arg not permitted."
-
