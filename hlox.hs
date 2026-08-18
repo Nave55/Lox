@@ -1916,7 +1916,7 @@ builtIns =
   ]
 
 ---------------------------------------------------------------------------------------
---                                    Run
+--                                      MAIN
 ---------------------------------------------------------------------------------------
 
 runFile :: FilePath -> IO ()
@@ -1925,8 +1925,8 @@ runFile path = do
   (_, outs) <- interpRun interpreterInit bytes
   mapM_ BS.putStrLn outs
 
-runPrompt :: IO ()
-runPrompt = do
+runRepl :: IO ()
+runRepl = do
   putStrLn "-----------------------------------------"
   putStrLn "                 LOX REPL                "
   putStrLn "-----------------------------------------"
@@ -1944,14 +1944,10 @@ runPrompt = do
           mapM_ BS.putStrLn outs
           loop interp'
 
----------------------------------------------------------------------------------------
---                                      MAIN
----------------------------------------------------------------------------------------
-
 main :: IO ()
 main = do
   args <- getArgs
   case args of
-    []  -> runPrompt
+    []  -> runRepl
     [p] -> runFile p
     _   -> putStrLn "Too many args. More than 1 arg not permitted."
