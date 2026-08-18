@@ -576,12 +576,12 @@ envInit = Env
   }
 
 envNew :: Env -> Env
-envNew parent =
-  Env
-    { e_map        = SM.empty
-    , e_enclosing  = Just parent
-    , e_loop_depth = e_loop_depth parent
-    }
+envNew parent = Env
+  { e_map        = SM.empty
+  , e_enclosing  = Just parent
+  , e_loop_depth = e_loop_depth parent
+  }
+
 
 envLoopEnter :: Env -> Env
 envLoopEnter env = env { e_loop_depth = e_loop_depth env + 1 }
