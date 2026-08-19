@@ -2,6 +2,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
+---------------------------------------------------------------------------
+--                             Imports & Aliases
+---------------------------------------------------------------------------
+
 import Data.List             (dropWhileEnd)
 import Numeric               (showFFloat)
 import Data.Maybe            (fromMaybe)
@@ -13,10 +17,6 @@ import Data.Char             (isDigit, isAlpha, isAlphaNum)
 
 import qualified Data.Map.Strict       as SM
 import qualified Data.ByteString.Char8 as BS
-
----------------------------------------------------------------------------
---                             Type Aliases
----------------------------------------------------------------------------
 
 type EitherEnv                  = Either BS.ByteString Env
 type EitherLoxValue             = Either BS.ByteString LoxValue
@@ -34,12 +34,7 @@ type EitherListBsLoxValueInterp = Either BS.ByteString ([BS.ByteString], LoxValu
 
 loxReport :: Int -> BS.ByteString -> BS.ByteString -> BS.ByteString
 loxReport line loc msg =
-  "[line "
-    <> BS.pack (show line)
-    <> "] Error "
-    <> loc
-    <> "-> "
-    <> msg
+  "[line " <> BS.pack (show line) <> "] Error " <> loc <> "-> " <> msg
 
 loxError :: Int -> BS.ByteString -> BS.ByteString
 loxError line = loxReport line ""
