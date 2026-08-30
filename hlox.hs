@@ -76,8 +76,7 @@ formatNum n l = BS.pack (stripDotZero (showFFloat Nothing (round' n l) ""))
         _ -> s
 
     round' num sg =
-      let f = 10 ** fromIntegral sg
-          rounded :: Integer
+      let f       = 10 ** fromIntegral sg
           rounded = round (num * f)
       in fromIntegral rounded / f
 
