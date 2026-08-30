@@ -61,11 +61,8 @@ bsToDouble bs =
     _ -> Nothing
 
 formatNum :: Double -> Integer -> BS.ByteString
-formatNum n l =
-  BS.pack (stripDotZero (showFFloat Nothing (round' n l) ""))
-
+formatNum n l = BS.pack (stripDotZero (showFFloat Nothing (round' n l) ""))
   where
-    stripDotZero :: String -> String
     stripDotZero s =
       case break (== '.') s of
         (int, "") ->
@@ -78,10 +75,8 @@ formatNum n l =
 
         _ -> s
 
-    round' :: Double -> Integer -> Double
     round' num sg =
-      let f :: Double
-          f = 10 ** fromIntegral sg
+      let f = 10 ** fromIntegral sg
           rounded :: Integer
           rounded = round (num * f)
       in fromIntegral rounded / f
