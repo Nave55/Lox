@@ -98,12 +98,14 @@ data TokenType
   -- Literals
   | IDENTIFIER | STRING | NUMBER
 
-  -- Keywords
-  | AND   | CLASS    | ELSE   | FALSE
-  | FUN   | FOR      | IF     | NIL
-  | OR    | PRINT    | RETURN | SUPER
-  | THIS  | TRUE     | VAR    | WHILE
-  | BREAK | CONTINUE
+  -- keywords
+  | IF     | ELSE     | FOR     | WHILE
+  | BREAK  | CONTINUE | RETURN
+  | AND    | OR       | TRUE    | FALSE
+  | VAR    | FUN      | CLASS
+  | THIS   | SUPER
+  | NIL
+  | PRINT
 
   | EOF
   deriving (Show, Eq)
