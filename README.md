@@ -21,7 +21,8 @@ A pure, persistent-structure implementation of jLox.
 
 ### Notes
 - I am **Not** an expert haskell developer so there are probably lots of mistakes and non idiomatic code
-- Just used Strict Map instead of HashMap for no dependencies
+- Cabal Project
+- Just used Strict Map instead of HashMap
 - Added `+=` operator
 - Implemented proper `for` statement
 - Added `break` and `continue`
