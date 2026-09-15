@@ -54,7 +54,7 @@ extra-doc-files:    CHANGELOG.md
 common warnings
     ghc-options: -Wall -Wextra -O2
 
-executable Lox
+executable Hlox
     -- Import common warning flags.
     import:           warnings
 
@@ -71,7 +71,7 @@ executable Lox
         Builtins
         Helpers
         Types
-
+        
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
 
