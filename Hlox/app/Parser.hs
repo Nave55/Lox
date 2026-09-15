@@ -3,7 +3,6 @@ module Parser where
 
 import Types
 import Helpers
-import Scanner
 
 import qualified Data.ByteString.Char8 as BS
 

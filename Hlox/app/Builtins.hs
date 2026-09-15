@@ -2,7 +2,6 @@
 module Builtins where
 
 import Types
-import Scanner
 import Helpers
 import System.IO.Unsafe      (unsafePerformIO)
 import Data.Time.Clock.POSIX (getPOSIXTime)

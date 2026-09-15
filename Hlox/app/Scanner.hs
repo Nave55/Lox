@@ -24,16 +24,6 @@ scannerInit s_source line =
     , s_errors = []
     }
 
-loxValueShow :: LoxValue -> BS.ByteString
-loxValueShow (L_NUMBER n)      = formatNum n 10
-loxValueShow (L_STRING s)      = s
-loxValueShow (L_BOOL b)        = if b then "true" else "false"
-loxValueShow L_NIL             = "nil"
-loxValueShow (L_FUN _)         = "<fn>"
-loxValueShow (L_CALL _)        = "<native fn>"
-loxValueShow (L_CLASS klass)   = lc_name klass
-loxValueShow (L_INSTANCE inst) = BS.pack (show inst)
-
 data LocField = LocCurr | LocLine
 locUpdate :: (Int -> Int) -> Scanner -> LocField -> Scanner
 locUpdate f sc LocCurr =
