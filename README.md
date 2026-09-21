@@ -1,4 +1,4 @@
-# Lox Interpreters (Haskell + Odin)
+# Lox Interpreters (Haskell + C3)
 
 Implementation of Lox from the book **Crafting Interpreters**  
 <https://craftinginterpreters.com/>
@@ -6,12 +6,12 @@ Implementation of Lox from the book **Crafting Interpreters**
 ## Projects
 
 - **hlox** – jLox tree-walking interpreter implemented in **Haskell**
-- **olox** – cLox byte code interpreter implemented in **Odin**
+- **c3lox** – cLox byte code interpreter implemented in **Odin**
 
 ## Progress
 
 - ✅ hlox
-- ❌ olox 
+- ❌ c3lox 
 
 - Currently working on **Chapter 14**
 
@@ -29,8 +29,6 @@ A pure, persistent-structure implementation of jLox.
 - Added some additional builtin functions
 - Uses persistent structures, so **no resolver class**
 
-## olox (Odin cLox)
+## c3lox (C3 cLox)
 
-A VM interpreter modeled after cLox, implemented in **Odin**.
-
-Implementation of Lox from the book Crafting Interpreters
+A VM interpreter modeled after cLox, implemented in **C3**.

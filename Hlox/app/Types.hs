@@ -166,8 +166,7 @@ data LoxFunction = LoxFunction
   , lf_initializer :: Bool
   }
   deriving (Show)
-
--- Now define your Either types
+  
 type EitherEnv = Either BS.ByteString Env
 type EitherLoxValue = Either BS.ByteString LoxValue
 type EitherParserTok = Either BS.ByteString (Parser, Token)
