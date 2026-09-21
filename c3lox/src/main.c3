@@ -2,8 +2,23 @@ module c3lox;
 
 import std::io;
 
-fn void main(String[] args) {;
-	char[] con = load_file("resources/input.txt")!!;
+fn void run_file(String path) {
+	char[] con = load_file(path)!!;
 	foreach (i : con) io::printf("%c", i);
 	io::printn();
+}
+
+
+fn void repl() {
+
+}
+
+fn void main(String[] args) {
+	if (args.len == 1) {
+		repl();
+	} else if (args.len == 2) {
+		run_file(args[1]);
+	} else {
+        io::printn("TOO MANY ARGS: Can only take 1 arg");
+    }
 }
