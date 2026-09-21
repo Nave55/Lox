@@ -1,0 +1,66 @@
+class A {
+  init(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+  
+  addXY() { print this.x + this.y; }
+}
+
+class B < A {
+  init(x, y) {
+    super.init(x, y);
+    this.x = x;
+    this.y = y;
+  }
+}
+
+fun evens_odds(i) {
+    if (mod(i, 2) == 0) {
+        return string(i) + " is even";
+    } else {
+        return string(i) + " is odd";
+    }
+}
+
+fun sqr(x) { 
+    return x * x; 
+}
+
+fun range_to(s, e, f) {
+    for (var i = s; i <= e; i += 1) {
+        print f(i);
+    }    
+}
+
+fun fib(n) {
+    fun loop(n, a, b) {
+        if (n <= 1) return a;
+        return loop(n - 1, b, a + b);
+    }
+    
+    return loop(n, 0, 1);
+}
+
+fun fib(n) {
+    fun loop(n, a, b) {
+        print a;
+        if (n <= 1) return a;
+        return loop(n - 1, b, a + b);
+    }
+    
+    return loop(n, 0, 1);
+}
+
+print "Class Example: ";
+var a = A(30, 50);
+var b = B(10, 20);
+a.addXY();
+b.addXY();
+
+print "Fib Example: ";
+fib(10);
+
+print "Range_to Example: ";
+range_to(1, 10, sqr);
+// range_to(1, 10, evens_odds);
