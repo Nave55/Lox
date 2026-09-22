@@ -29,6 +29,6 @@ fn void Chunk.free(Chunk* chunk) {
 	chunk.lines.free();
 }
 
-fn Uint8 Chunk.add_constant(Chunk* chunk, Value value) {
-	return (Uint8)chunk.constants.write(value);
+fn Uint8 Chunk.add_constant(Chunk* chunk, Value val) {
+	return (Uint8)chunk.constants.write(val);
 }

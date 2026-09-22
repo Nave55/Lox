@@ -2,6 +2,36 @@ module c3lox;
 
 import std::collections::list;
 
+enum ValueType : Uint8 {
+  BOOL,
+  NUMBER,
+  NIL,
+  STR,
+  FUNC,
+  NATIVE,
+  CLOSURE,
+  CLASS,
+  INSTANCE,
+  BOUND
+}
+
+union ValueData {
+    bool    as_bool;
+    double  as_num;
+    String  as_str;
+    // Func*   as_func;
+    // Native* as_native;
+    // Closure* as_closure;
+    // Class* as_class;
+    // Instance* as_instance;
+    // BoundMethod* as_bound;
+}
+
+struct Value {
+  ValueData val;
+  ValueType tag;
+}
+
 struct ValueArray {
 	List{Value} values;
 }
@@ -10,9 +40,9 @@ fn void ValueArray.init(ValueArray* array, Allocator alloc = tmem) {
 	array.values.init(alloc);
 }
 
-fn sz ValueArray.write(ValueArray* array, Value value) {
+fn sz ValueArray.write(ValueArray* array, Value val) {
 	sz count = array.values.size;
-	array.values.push(value);
+	array.values.push(val);
 
 	return count;
 }

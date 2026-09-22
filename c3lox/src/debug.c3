@@ -31,7 +31,7 @@ fn Int32 Chunk.disassemble_instruction(Chunk* chunk, Int32 offset) {
 }
 
 fn Int32 simple_instruction(String name, Int32 offset) {
-	io::printf("%s\n", name);
+	io::printn(name);
 	return offset + 1;
 }
 
@@ -43,6 +43,15 @@ fn Int32 Chunk.constant_instruction(Chunk* chunk, String name, Int32 offset) {
 	return offset + 2;
 }
 
-fn void print_value(Value value) {
-	io::printf("%g", value);
+fn void print_value(Value val) {
+  switch (val.tag) {
+    case NUMBER: 
+  	  io::printf("%g", val.val.as_num);
+    case BOOL: 
+  	  io::printf("%s", val.val.as_bool);
+    case STR: 
+  	  io::printf("%s", val.val.as_str);
+    default:
+      io::printn("DEFAULT");
+  }
 }

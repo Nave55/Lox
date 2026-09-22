@@ -6,12 +6,15 @@ import std::core::mem;
 fn void run_file(String path) {
 	char[] con = load_file(tmem, path)!!;
 	// io::printfn("%s", (String)con);
+
 	Chunk chunk;
 	chunk.init();
-	Uint8 constant = chunk.add_constant(1.2);
+
+	ValueData val;
+	val.as_num = 1.2;
+	Uint8 constant = chunk.add_constant({ val, NUMBER });
 	chunk.write(Op.CONSTANT.ordinal, 123);
 	chunk.write(constant, 123);
-
 	chunk.write(Op.RETURN.ordinal, 123);
 	chunk.disassemble_chunk("test chunk");
 }
