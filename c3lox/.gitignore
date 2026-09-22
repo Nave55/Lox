@@ -2,3 +2,5 @@ build/
 out/
 resources/
 .vscode
+.zed
+.c3fmt
