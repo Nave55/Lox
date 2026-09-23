@@ -1,10 +1,9 @@
 module c3lox;
 
 import std::io;
-import std::core::mem;
 
 fn void run_file(String path) {
-	char[] con = load_file(tmem, path)!!;
+	char[] con = load_file(path)!!;
 	// io::printfn("%s", (String)con);
 
 	Chunk chunk;
@@ -23,7 +22,7 @@ fn void repl() {
 	io::printn("Repl Placeholder");
 }
 
-fn void main(String[] args) => @pool() {
+fn void main(String[] args) {
 	if (args.len == 1) {
 		repl();
 	} else if (args.len == 2) {

@@ -3,33 +3,33 @@ module c3lox;
 import std::collections::list;
 
 enum ValueType : Uint8 {
-  BOOL,
-  NUMBER,
-  NIL,
-  STR,
-  FUNC,
-  NATIVE,
-  CLOSURE,
-  CLASS,
-  INSTANCE,
-  BOUND
+	BOOL,
+	NUMBER,
+	NIL,
+	STR,
+	FUNC,
+	NATIVE,
+	CLOSURE,
+	CLASS,
+	INSTANCE,
+	BOUND
 }
 
 union ValueData {
-    bool    as_bool;
-    double  as_num;
-    String  as_str;
-    // Func*   as_func;
-    // Native* as_native;
-    // Closure* as_closure;
-    // Class* as_class;
-    // Instance* as_instance;
-    // BoundMethod* as_bound;
+	bool as_bool;
+	double as_num;
+	String as_str;
+	// Func*   as_func;
+	// Native* as_native;
+	// Closure* as_closure;
+	// Class* as_class;
+	// Instance* as_instance;
+	// BoundMethod* as_bound;
 }
 
 struct Value {
-  ValueData val;
-  ValueType tag;
+	ValueData val;
+	ValueType tag;
 }
 
 struct ValueArray {
