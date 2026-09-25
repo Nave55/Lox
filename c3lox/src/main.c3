@@ -5,17 +5,33 @@ import std::io;
 fn void run_file(String path) {
 	char[] con = load_file(path)!!;
 	// io::printfn("%s", (String)con);
+	vm.init();
 
 	Chunk chunk;
 	chunk.init();
 
-	ValueData val;
-	val.as_num = 1.2;
-	Uint8 constant = chunk.add_constant({ val, NUMBER });
+	Uint8 constant = chunk.add_constant(@to_value(1.2, ValueType.NUMBER));
 	chunk.write(Op.CONSTANT.ordinal, 123);
 	chunk.write(constant, 123);
+
+	constant = chunk.add_constant(@to_value(3.4, ValueType.NUMBER));
+	chunk.write(Op.CONSTANT.ordinal, 123);
+	chunk.write(constant, 123);
+
+	chunk.write(Op.ADD.ordinal, 123);
+
+	constant = chunk.add_constant(@to_value(5.6, ValueType.NUMBER));
+	chunk.write(Op.CONSTANT.ordinal, 123);
+	chunk.write(constant, 123);
+
+	chunk.write(Op.DIVIDE.ordinal, 123);
+
+	chunk.write(Op.NEGATE.ordinal, 123);
+
 	chunk.write(Op.RETURN.ordinal, 123);
 	chunk.disassemble_chunk("test chunk");
+
+	vm.interpret(&chunk);
 }
 
 fn void repl() {

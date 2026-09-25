@@ -36,6 +36,24 @@ struct ValueArray {
 	List{Value} values;
 }
 
+macro @to_value(#val, #tag) {
+	Value value;
+	value.tag = #tag;
+
+	$switch #tag:
+		$case NUMBER:
+			value.val.as_num = #val;
+		$case BOOL:
+			value.val.as_bool = #val;
+		$case STRING:
+			value.val.as_str = #val;
+		$default:
+			value = { };
+	$endswitch
+
+	return value;
+}
+
 fn void ValueArray.init(ValueArray* array, Allocator alloc = tmem) {
 	array.values.init(alloc);
 }

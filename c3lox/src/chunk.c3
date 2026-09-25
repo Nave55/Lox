@@ -4,6 +4,11 @@ import std::collections::list;
 
 enum Op : Uint8 {
 	CONSTANT,
+	ADD,
+	SUBTRACT,
+	MULTIPLY,
+	DIVIDE,
+	NEGATE,
 	RETURN,
 }
 

@@ -22,6 +22,16 @@ fn sz Chunk.disassemble_instruction(Chunk* chunk, sz offset) {
 	switch (instruction) {
 		case Op.CONSTANT.ordinal:
 			return chunk.constant_instruction("CONSTANT", offset);
+		case Op.ADD.ordinal:
+			return simple_instruction("ADD", offset);
+		case Op.SUBTRACT.ordinal:
+			return simple_instruction("SUBTRACT", offset);
+		case Op.MULTIPLY.ordinal:
+			return simple_instruction("MULTIPLY", offset);
+		case Op.DIVIDE.ordinal:
+			return simple_instruction("DIVIDE", offset);
+		case Op.NEGATE.ordinal:
+			return simple_instruction("NEGATE", offset);
 		case Op.RETURN.ordinal:
 			return simple_instruction("RETURN", offset);
 		default:
