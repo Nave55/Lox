@@ -1,50 +1,47 @@
 module c3lox;
 
 import std::io;
+import std::os;
 
 fn void run_file(String path) => @pool() {
-	char[] con = load_file(path)!!;
-	vm.init();
+	char[]? con = file::load_temp(path);
+	if (catch err = con) {
+		io::eprintfn("Could not open file '%s'", path);
+		os::exit(74);
+	} else {
+		vm_init();
 
-	Chunk chunk;
-	chunk.init();
+		Chunk chunk;
+		chunk.init();
 
-	Uint8 constant = chunk.add_constant(to_value(1.2));
-	chunk.write(Op.CONSTANT.ordinal, 123);
-	chunk.write(constant, 123);
-
-	constant = chunk.add_constant(to_value(3.4));
-	chunk.write(Op.CONSTANT.ordinal, 123);
-	chunk.write(constant, 123);
-
-	chunk.write(Op.ADD.ordinal, 123);
-
-	constant = chunk.add_constant(to_value(5.6));
-	chunk.write(Op.CONSTANT.ordinal, 123);
-	chunk.write(constant, 123);
-
-	chunk.write(Op.DIVIDE.ordinal, 123);
-
-	chunk.write(Op.NEGATE.ordinal, 123);
-
-	chunk.write(Op.RETURN.ordinal, 123);
-	chunk.disassemble_chunk("test chunk");
-
-	if (catch err = vm.interpret(&chunk)) {
-		io::printn(err);
+		compile(con);
 	}
 }
 
-fn void repl() {
-	io::printn("Repl Placeholder");
+fn void repl() => @pool() {
+	io::printn("-----------------------------------------");
+	io::printn("                 LOX REPL                ");
+	io::printn("-----------------------------------------");
+
+	for (;;) {
+		io::printf(">>> ");
+		String line = io::treadline()!!;
+		if (line == "exit") {
+			return;
+		}
+		io::printn(line);
+	}
 }
 
-fn void main(String[] args) {
+fn int main(String[] args) {
 	if (args.len == 1) {
 		repl();
 	} else if (args.len == 2) {
 		run_file(args[1]);
 	} else {
-		io::printn("TOO MANY ARGS: Can only take 1 arg");
+		io::eprintf("TOO MANY ARGS: Can only take 1 arg");
+		os::exit(64);
 	}
+
+	return 0;
 }
