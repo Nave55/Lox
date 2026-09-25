@@ -8,3 +8,5 @@ alias Uint32 = uint; // uint32_t
 alias Int32 = int; // int / long / int32_t
 alias Uint64 = ulong; // uint64_t
 alias Int64 = long; // long long
+
+alias BinaryFn = fn double(double, double);

@@ -4,7 +4,6 @@ import std::io;
 
 fn void run_file(String path) => @pool() {
 	char[] con = load_file(path)!!;
-	// io::printfn("%s", (String)con);
 	vm.init();
 
 	Chunk chunk;
@@ -32,7 +31,7 @@ fn void run_file(String path) => @pool() {
 	chunk.disassemble_chunk("test chunk");
 
 	if (catch err = vm.interpret(&chunk)) {
-	  io::printn(err);
+		io::printn(err);
 	}
 }
 

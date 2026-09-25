@@ -11,9 +11,9 @@ struct Vm {
 	Value* stack_top;
 }
 
-excuse COMPILE_ERROR, RUNTIME_ERROR;
-
 Vm vm;
+
+excuse COMPILE_ERROR, RUNTIME_ERROR;
 
 fn void Vm.init(Vm* vm) {
 	vm.reset_stack();
@@ -26,31 +26,13 @@ fn void Vm.reset_stack(Vm* vm) {
 	vm.stack_top = &vm.stack;
 }
 
-macro _read_byte() {
-	return *vm.ip++;
-}
+fn Uint8 _read_byte() => *vm.ip++;
+fn Value _read_constant() => vm.chunk.constants.values[_read_byte()];
 
-macro _read_constant() {
-	return vm.chunk.constants.values[_read_byte()];
-}
-
-macro _binary_op($op) {
+fn void _binary_op(BinaryFn f) {
 	double b = vm.pop().val.as_num;
 	double a = vm.pop().val.as_num;
-	double r;
-
-	$switch $op:
-		$case "+":
-			r = a + b;
-		$case "-":
-			r = a - b;
-		$case "*":
-			r = a * b;
-		$case "/":
-			r = a / b;
-	$endswitch
-
-	vm.push({ (ValueData) { .as_num = r }, NUMBER });
+	vm.push({ (ValueData) { .as_num = f(a, b) }, NUMBER });
 }
 
 fn void? Vm.run(Vm* vm) {
@@ -65,19 +47,20 @@ fn void? Vm.run(Vm* vm) {
 			io::printn();
 			vm.chunk.disassemble_instruction(vm.ip - &vm.chunk.code[0]);
 		$endif
+
 		Uint8 instruction;
 		switch (instruction = _read_byte()) {
 			case Op.CONSTANT.ordinal:
 				Value constant = _read_constant();
 				vm.push(constant);
 			case Op.ADD.ordinal:
-				_binary_op("+");
+				_binary_op(fn (a, b) => a + b);
 			case Op.SUBTRACT.ordinal:
-				_binary_op("-");
+				_binary_op(fn (a, b) => a - b);
 			case Op.MULTIPLY.ordinal:
-				_binary_op("*");
+				_binary_op(fn (a, b) => a * b);
 			case Op.DIVIDE.ordinal:
-				_binary_op("/");
+				_binary_op(fn (a, b) => a / b);
 			case Op.NEGATE.ordinal:
 				Value val = vm.pop();
 				if (val.tag == NUMBER) {
