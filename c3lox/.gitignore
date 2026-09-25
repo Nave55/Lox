@@ -1,6 +1,6 @@
 build/
 out/
-resources/
+resources/*.txt
 .vscode
 .zed
 .c3fmt

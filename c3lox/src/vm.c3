@@ -11,11 +11,7 @@ struct Vm {
 	Value* stack_top;
 }
 
-enum InterpretResult {
-	OK,
-	COMPILE_ERROR,
-	RUNTIME_ERROR,
-}
+faultdef COMPILE_ERROR, RUNTIME_ERROR;
 
 Vm vm;
 
@@ -57,7 +53,7 @@ macro _binary_op($op) {
 	vm.push({ (ValueData) { .as_num = r }, NUMBER });
 }
 
-fn InterpretResult Vm.run(Vm* vm) {
+fn void? Vm.run(Vm* vm) {
 	for (;;) {
 		$if $defined(DEBUG_TRACE_EXECUTION):
 			io::printf("          ");
@@ -91,12 +87,12 @@ fn InterpretResult Vm.run(Vm* vm) {
 			case Op.RETURN.ordinal:
 				print_value(vm.pop());
 				io::printn();
-				return OK;
+				return;
 		}
 	}
 }
 
-fn InterpretResult Vm.interpret(Vm* vm, Chunk* chunk) {
+fn void? Vm.interpret(Vm* vm, Chunk* chunk) {
 	vm.chunk = chunk;
 	vm.ip = &vm.chunk.code[0];
 	return vm.run();

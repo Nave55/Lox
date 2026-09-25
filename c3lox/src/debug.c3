@@ -62,6 +62,6 @@ fn void print_value(Value val) {
 		case STR:
 			io::printf("%s", val.val.as_str);
 		default:
-			io::printn("DEFAULT");
+			io::printf("DEFAULT");
 	}
 }

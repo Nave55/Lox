@@ -10,17 +10,17 @@ fn void run_file(String path) => @pool() {
 	Chunk chunk;
 	chunk.init();
 
-	Uint8 constant = chunk.add_constant(@to_value(1.2));
+	Uint8 constant = chunk.add_constant(to_value(1.2));
 	chunk.write(Op.CONSTANT.ordinal, 123);
 	chunk.write(constant, 123);
 
-	constant = chunk.add_constant(@to_value(3.4));
+	constant = chunk.add_constant(to_value(3.4));
 	chunk.write(Op.CONSTANT.ordinal, 123);
 	chunk.write(constant, 123);
 
 	chunk.write(Op.ADD.ordinal, 123);
 
-	constant = chunk.add_constant(@to_value(5.6));
+	constant = chunk.add_constant(to_value(5.6));
 	chunk.write(Op.CONSTANT.ordinal, 123);
 	chunk.write(constant, 123);
 
@@ -31,8 +31,9 @@ fn void run_file(String path) => @pool() {
 	chunk.write(Op.RETURN.ordinal, 123);
 	chunk.disassemble_chunk("test chunk");
 
-	InterpretResult res = vm.interpret(&chunk);
-	io::printn(res);
+	if (catch err = vm.interpret(&chunk)) {
+	  io::printn(err);
+	}
 }
 
 fn void repl() {
