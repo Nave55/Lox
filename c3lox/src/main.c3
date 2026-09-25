@@ -2,7 +2,7 @@ module c3lox;
 
 import std::io;
 
-fn void run_file(String path) {
+fn void run_file(String path) => @pool() {
 	char[] con = load_file(path)!!;
 	// io::printfn("%s", (String)con);
 	vm.init();
@@ -10,17 +10,17 @@ fn void run_file(String path) {
 	Chunk chunk;
 	chunk.init();
 
-	Uint8 constant = chunk.add_constant(@to_value(1.2, ValueType.NUMBER));
+	Uint8 constant = chunk.add_constant(@to_value(1.2));
 	chunk.write(Op.CONSTANT.ordinal, 123);
 	chunk.write(constant, 123);
 
-	constant = chunk.add_constant(@to_value(3.4, ValueType.NUMBER));
+	constant = chunk.add_constant(@to_value(3.4));
 	chunk.write(Op.CONSTANT.ordinal, 123);
 	chunk.write(constant, 123);
 
 	chunk.write(Op.ADD.ordinal, 123);
 
-	constant = chunk.add_constant(@to_value(5.6, ValueType.NUMBER));
+	constant = chunk.add_constant(@to_value(5.6));
 	chunk.write(Op.CONSTANT.ordinal, 123);
 	chunk.write(constant, 123);
 
@@ -31,7 +31,8 @@ fn void run_file(String path) {
 	chunk.write(Op.RETURN.ordinal, 123);
 	chunk.disassemble_chunk("test chunk");
 
-	vm.interpret(&chunk);
+	InterpretResult res = vm.interpret(&chunk);
+	io::printn(res);
 }
 
 fn void repl() {

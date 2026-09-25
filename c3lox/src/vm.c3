@@ -30,16 +30,15 @@ fn void Vm.reset_stack(Vm* vm) {
 	vm.stack_top = &vm.stack;
 }
 
-
-macro read_byte() {
+macro _read_byte() {
 	return *vm.ip++;
 }
 
-macro read_constant() {
-	return vm.chunk.constants.values[read_byte()];
+macro _read_constant() {
+	return vm.chunk.constants.values[_read_byte()];
 }
 
-macro binary_op($op) {
+macro _binary_op($op) {
 	double b = vm.pop().val.as_num;
 	double a = vm.pop().val.as_num;
 	double r;
@@ -71,18 +70,18 @@ fn InterpretResult Vm.run(Vm* vm) {
 			vm.chunk.disassemble_instruction(vm.ip - vm.chunk.code);
 		$endif
 		Uint8 instruction;
-		switch (instruction = read_byte()) {
+		switch (instruction = _read_byte()) {
 			case Op.CONSTANT.ordinal:
-				Value constant = read_constant();
+				Value constant = _read_constant();
 				vm.push(constant);
 			case Op.ADD.ordinal:
-				binary_op("+");
+				_binary_op("+");
 			case Op.SUBTRACT.ordinal:
-				binary_op("-");
+				_binary_op("-");
 			case Op.MULTIPLY.ordinal:
-				binary_op("*");
+				_binary_op("*");
 			case Op.DIVIDE.ordinal:
-				binary_op("/");
+				_binary_op("/");
 			case Op.NEGATE.ordinal:
 				Value val = vm.pop();
 				if (val.tag == NUMBER) {
