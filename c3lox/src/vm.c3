@@ -11,7 +11,7 @@ struct Vm {
 	Value* stack_top;
 }
 
-faultdef COMPILE_ERROR, RUNTIME_ERROR;
+excuse COMPILE_ERROR, RUNTIME_ERROR;
 
 Vm vm;
 
@@ -55,15 +55,15 @@ macro _binary_op($op) {
 
 fn void? Vm.run(Vm* vm) {
 	for (;;) {
-		$if $defined(DEBUG_TRACE_EXECUTION):
+		$if $feat(DEBUG_TRACE_EXECUTION):
 			io::printf("          ");
-			for (Value* slot = &vm.stack; slot < vm.stacktop; slot++) {
+			for (Value* slot = &vm.stack; slot < vm.stack_top; slot++) {
 				io::printf("[ ");
 				print_value(*slot);
-				printf(" ]");
+				io::printf(" ]");
 			}
 			io::printn();
-			vm.chunk.disassemble_instruction(vm.ip - vm.chunk.code);
+			vm.chunk.disassemble_instruction(vm.ip - &vm.chunk.code[0]);
 		$endif
 		Uint8 instruction;
 		switch (instruction = _read_byte()) {
