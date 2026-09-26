@@ -15,7 +15,7 @@ fn void compile(char[] source) {
 			io::printf("   | ");
 		}
 
-		io::printfn("%s '%s'", token.type, (String)token.start[:token.length]);
+		io::printfn("%s '%s'", token.type, token.lexeme);
 
 		if (token.type == EOF) {
 			break;

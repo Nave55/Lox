@@ -55,24 +55,23 @@ enum TokenType {
 
 struct Token {
 	TokenType type;
-	char* start;
-	sz length;
+	String lexeme;
 	sz line;
 }
 
 struct Scanner {
-	char* start;
-	char* current;
-	char* end;
+	char[] source;
+	sz start;
+	sz current;
 	sz line;
 }
 
 Scanner scanner;
 
 fn void init(char[] source) {
-	scanner.start = &source[0];
-	scanner.current = &source[0];
-	scanner.end = &source[0] + source.len;
+	scanner.source = source;
+	scanner.start = 0;
+	scanner.current = 0;
 	scanner.line = 1;
 }
 
@@ -84,27 +83,27 @@ fn bool is_digit(char c) {
 	return c >= '0' && c <= '9';
 }
 
-fn bool at_end() => scanner.current >= scanner.end;
+fn bool at_end(sz offset = 0) => scanner.current + offset >= scanner.source.len;
 
 fn char advance() {
+	char c = scanner.source[scanner.current];
 	scanner.current++;
-	return scanner.current[-1];
+	return c;
 }
 
-fn char peek() => *scanner.current;
+fn char peek() {
+	if (at_end()) return '\0';
+	return scanner.source[scanner.current];
+}
 
 fn char peek_next() {
-	if (at_end()) return '\0';
-	return scanner.current[1];
+	if (at_end(1)) return '\0';
+	return scanner.source[scanner.current + 1];
 }
 
 fn bool match(char expected) {
-	if (at_end()) {
-		return false;
-	}
-	if (*scanner.current != expected) {
-		return false;
-	}
+	if (at_end()) return false;
+	if (scanner.source[scanner.current] != expected) return false;
 	scanner.current++;
 	return true;
 }
@@ -112,8 +111,7 @@ fn bool match(char expected) {
 fn Token make_token(TokenType type) {
 	Token token;
 	token.type = type;
-	token.start = scanner.start;
-	token.length = scanner.current - scanner.start;
+	token.lexeme = (String)scanner.source[scanner.start:scanner.current - scanner.start];
 	token.line = scanner.line;
 	return token;
 }
@@ -121,8 +119,7 @@ fn Token make_token(TokenType type) {
 fn Token error_token(String message) {
 	Token token;
 	token.type = ERROR;
-	token.start = &message[0];
-	token.length = message.len;
+	token.lexeme = message;
 	token.line = scanner.line;
 	return token;
 }
@@ -140,9 +137,7 @@ fn void skip_whitespace() {
 				advance();
 			case '/':
 				if (peek_next() == '/') {
-					while (peek() != '\n' && !at_end()) {
-						advance();
-					}
+					while (peek() != '\n' && !at_end()) advance();
 				} else {
 					return;
 				}
@@ -152,9 +147,9 @@ fn void skip_whitespace() {
 	}
 }
 
-fn TokenType check_keyword(sz start, sz length, char* rest, TokenType type) {
+fn TokenType check_keyword(sz start, sz length, ZString rest, TokenType type) {
 	if (scanner.current - scanner.start == start + length
-		&& scanner.start[start:length] == rest[:length]) {
+		&& scanner.source[scanner.start + start:length] == rest[:length]) {
 		return type;
 	}
 
@@ -162,13 +157,13 @@ fn TokenType check_keyword(sz start, sz length, char* rest, TokenType type) {
 }
 
 fn TokenType identifier_type() {
-	switch (scanner.start[0]) {
+	switch (scanner.source[scanner.start]) {
 		case 'a': return check_keyword(1, 2, "nd", AND);
 		case 'c': return check_keyword(1, 4, "lass", CLASS);
 		case 'e': return check_keyword(1, 3, "lse", ELSE);
 		case 'f':
 			if (scanner.current - scanner.start > 1) {
-				switch (scanner.start[1]) {
+				switch (scanner.source[scanner.start + 1]) {
 					case 'a': return check_keyword(2, 3, "lse", FALSE);
 					case 'o': return check_keyword(2, 1, "r", FOR);
 					case 'u': return check_keyword(2, 1, "n", FUN);
@@ -182,7 +177,7 @@ fn TokenType identifier_type() {
 		case 's': return check_keyword(1, 4, "uper", SUPER);
 		case 't':
 			if (scanner.current - scanner.start > 1) {
-				switch (scanner.start[1]) {
+				switch (scanner.source[scanner.start + 1]) {
 					case 'h': return check_keyword(2, 2, "is", THIS);
 					case 'r': return check_keyword(2, 2, "ue", TRUE);
 				}
@@ -195,10 +190,7 @@ fn TokenType identifier_type() {
 }
 
 fn Token identifier() {
-	while (is_alpha(peek()) || is_digit(peek())) {
-		advance();
-	}
-
+	while (is_alpha(peek()) || is_digit(peek())) advance();
 	return make_token(identifier_type());
 }
 
@@ -207,7 +199,6 @@ fn Token number() {
 
 	if (peek() == '.' && is_digit(peek_next())) {
 		advance();
-
 		while (is_digit(peek())) advance();
 	}
 
@@ -215,17 +206,14 @@ fn Token number() {
 }
 
 fn Token string() {
-	while (peek() != '"' && !at_end()) {
+	while (peek() != '"') {
 		if (peek() == '\n') {
 			scanner.line++;
 			advance();
 		}
 	}
 
-	if (at_end()) {
-		return error_token("Unterminated string.");
-	}
-
+	if (at_end()) return error_token("Unterminated string.");
 	advance();
 	return make_token(STRING);
 }
@@ -239,12 +227,8 @@ fn Token scan_token() {
 	}
 
 	char c = advance();
-	if (is_alpha(c)) {
-		return identifier();
-	}
-	if (is_digit(c)) {
-		return number();
-	}
+	if (is_alpha(c)) return identifier();
+	if (is_digit(c)) return number();
 
 	switch (c) {
 		case '(': return make_token(LEFT_PAREN);
