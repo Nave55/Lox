@@ -10,11 +10,8 @@ fn void run_file(String path) => @pool() {
 		os::exit(74);
 	} else {
 		vm_init();
-
-		Chunk chunk;
-		chunk.init();
-
-		compile(con);
+		if (try vm_interpret(con)) {
+		}
 	}
 }
 
@@ -26,10 +23,12 @@ fn void repl() => @pool() {
 	for (;;) {
 		io::printf(">>> ");
 		String line = io::treadline()!!;
-		if (line == "exit") {
+		if (line == "exit" || line == ":q" || line == "quit") {
 			return;
 		}
-		compile(line);
+
+		if (try vm_interpret(line)) {
+		}
 	}
 }
 

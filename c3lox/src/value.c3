@@ -36,21 +36,21 @@ struct ValueArray {
 	List{Value} values;
 }
 
-macro to_value($val) {
-	$switch $Typeof($val):
+macro @to_value(#val) {
+	$switch $Typeof(#val):
 		$case double:
-			return (Value) { (ValueData) { .as_num = $val }, NUMBER };
+			return (Value) { (ValueData) { .as_num = #val }, NUMBER };
 		$case bool:
-			return (Value) { (ValueData) { .as_bool = $val }, BOOL };
+			return (Value) { (ValueData) { .as_bool = #val }, BOOL };
 		$case string:
-			return (Value) { (ValueData) { .as_str = $val }, STR };
+			return (Value) { (ValueData) { .as_str = #val }, STR };
 		$default:
 			(Value) { };
 	$endswitch
 }
 
-fn void ValueArray.init(ValueArray* array, Allocator alloc = tmem) {
-	array.values.init(alloc);
+fn void ValueArray.tinit(ValueArray* array) {
+	array.values.tinit();
 }
 
 fn sz ValueArray.write(ValueArray* array, Value val) {

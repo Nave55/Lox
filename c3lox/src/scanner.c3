@@ -1,63 +1,6 @@
-module scanner;
+module c3lox;
 
 import std::io;
-
-enum TokenType {
-	// Single-character tokens.
-	LEFT_PAREN,
-	RIGHT_PAREN,
-	LEFT_BRACE,
-	RIGHT_BRACE,
-	COMMA,
-	DOT,
-	MINUS,
-	PLUS,
-	SEMICOLON,
-	SLASH,
-	STAR,
-
-	// One or two character tokens.
-	BANG,
-	BANG_EQUAL,
-	EQUAL,
-	EQUAL_EQUAL,
-	GREATER,
-	GREATER_EQUAL,
-	LESS,
-	LESS_EQUAL,
-
-	// Literals.
-	IDENTIFIER,
-	STRING,
-	NUMBER,
-
-	// Keywords.
-	AND,
-	CLASS,
-	ELSE,
-	FALSE,
-	FOR,
-	FUN,
-	IF,
-	NIL,
-	OR,
-	PRINT,
-	RETURN,
-	SUPER,
-	THIS,
-	TRUE,
-	VAR,
-	WHILE,
-
-	ERROR,
-	EOF
-}
-
-struct Token {
-	TokenType type;
-	String lexeme;
-	sz line;
-}
 
 struct Scanner {
 	char[] source;
@@ -68,73 +11,57 @@ struct Scanner {
 
 Scanner scanner;
 
-fn void init(char[] source) {
+fn void scanner_init(char[] source) {
 	scanner.source = source;
 	scanner.start = 0;
 	scanner.current = 0;
 	scanner.line = 1;
 }
 
-fn bool is_alpha(char c) {
+fn bool scanner_is_alpha(char c) {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
 
-fn bool is_digit(char c) => c >= '0' && c <= '9';
-fn bool is_at_end(sz off = 0) => scanner.current + off >= scanner.source.len;
+fn bool scanner_is_digit(char c) => c >= '0' && c <= '9';
+fn bool scanner_is_at_end(sz off = 0) => scanner.current + off >= scanner.source.len;
 
-fn char advance() {
+fn char scanner_advance() {
 	char c = scanner.source[scanner.current];
 	scanner.current++;
 	return c;
 }
 
-fn char peek() {
-  if (is_at_end()) return '\0';
-  return scanner.source[scanner.current];
+fn char scanner_peek() {
+	if (scanner_is_at_end()) return '\0';
+	return scanner.source[scanner.current];
 }
 
-fn char peek_next() {
-	if (is_at_end(1)) return '\0';
+fn char scanner_peek_next() {
+	if (scanner_is_at_end(1)) return '\0';
 	return scanner.source[scanner.current + 1];
 }
 
-fn bool match(char expected) {
-	if (is_at_end()) return false;
+fn bool scanner_match(char expected) {
+	if (scanner_is_at_end()) return false;
 	if (scanner.source[scanner.current] != expected) return false;
 	scanner.current++;
 	return true;
 }
 
-fn Token make_token(TokenType type) {
-	Token token;
-	token.type = type;
-	token.lexeme = (String)scanner.source[scanner.start..scanner.current - 1];
-	token.line = scanner.line;
-	return token;
-}
-
-fn Token error_token(String message) {
-	Token token;
-	token.type = ERROR;
-	token.lexeme = message;
-	token.line = scanner.line;
-	return token;
-}
-
-fn void skip_whitespace() {
+fn void scanner_skip_whitespace() {
 	for (;;) {
-		char c = peek();
+		char c = scanner_peek();
 		switch (c) {
 			case ' ':
 			case '\r':
 			case '\t':
-				advance();
+				scanner_advance();
 			case '\n':
 				scanner.line++;
-				advance();
+				scanner_advance();
 			case '/':
-				if (peek_next() == '/') {
-					while (peek() != '\n' && !is_at_end()) advance();
+				if (scanner_peek_next() == '/') {
+					while (scanner_peek() != '\n' && !scanner_is_at_end()) scanner_advance();
 				} else {
 					return;
 				}
@@ -145,15 +72,14 @@ fn void skip_whitespace() {
 }
 
 fn TokenType check_keyword(sz start, sz length, String rest, TokenType type) {
-	if (scanner.current - scanner.start == start + length
-		&& scanner.source[scanner.start + start:length] == rest) {
+	if (scanner.current - scanner.start == start + length && scanner.source[scanner.start + start:length] == rest) {
 		return type;
 	}
 
 	return IDENTIFIER;
 }
 
-fn TokenType identifier_type() {
+fn TokenType scanner_identifier_type() {
 	switch (scanner.source[scanner.start]) {
 		case 'a': return check_keyword(1, 2, "nd", AND);
 		case 'c': return check_keyword(1, 4, "lass", CLASS);
@@ -186,46 +112,46 @@ fn TokenType identifier_type() {
 	return IDENTIFIER;
 }
 
-fn Token identifier() {
-	while (is_alpha(peek()) || is_digit(peek())) advance();
-	return make_token(identifier_type());
+fn Token scanner_identifier() {
+	while (scanner_is_alpha(scanner_peek()) || scanner_is_digit(scanner_peek())) scanner_advance();
+	return make_token(scanner_identifier_type());
 }
 
-fn Token number() {
-	while (is_digit(peek())) advance();
+fn Token scanner_number() {
+	while (scanner_is_digit(scanner_peek())) scanner_advance();
 
-	if (peek() == '.' && is_digit(peek_next())) {
-		advance();
-		while (is_digit(peek())) advance();
+	if (scanner_peek() == '.' && scanner_is_digit(scanner_peek_next())) {
+		scanner_advance();
+		while (scanner_is_digit(scanner_peek())) scanner_advance();
 	}
 
 	return make_token(NUMBER);
 }
 
-fn Token string() {
-	while (peek() != '"') {
-		if (peek() == '\n') {
+fn Token scanner_string() {
+	while (scanner_peek() != '"') {
+		if (scanner_peek() == '\n') {
 			scanner.line++;
-			advance();
+			scanner_advance();
 		}
 	}
 
-	if (is_at_end()) return error_token("Unterminated string.");
-	advance();
+	if (scanner_is_at_end()) return error_token("Unterminated string.");
+	scanner_advance();
 	return make_token(STRING);
 }
 
 fn Token scan_token() {
-	skip_whitespace();
+	scanner_skip_whitespace();
 	scanner.start = scanner.current;
 
-	if (is_at_end()) {
+	if (scanner_is_at_end()) {
 		return make_token(EOF);
 	}
 
-	char c = advance();
-	if (is_alpha(c)) return identifier();
-	if (is_digit(c)) return number();
+	char c = scanner_advance();
+	if (scanner_is_alpha(c)) return scanner_identifier();
+	if (scanner_is_digit(c)) return scanner_number();
 
 	switch (c) {
 		case '(': return make_token(LEFT_PAREN);
@@ -239,11 +165,11 @@ fn Token scan_token() {
 		case '+': return make_token(PLUS);
 		case '/': return make_token(SLASH);
 		case '*': return make_token(STAR);
-		case '!': return make_token(match('=') ? BANG_EQUAL : BANG);
-		case '=': return make_token(match('=') ? EQUAL_EQUAL : EQUAL);
-		case '<': return make_token(match('=') ? LESS_EQUAL : LESS);
-		case '>': return make_token(match('=') ? GREATER_EQUAL : GREATER);
-		case '"': return string();
+		case '!': return make_token(scanner_match('=') ? BANG_EQUAL : BANG);
+		case '=': return make_token(scanner_match('=') ? EQUAL_EQUAL : EQUAL);
+		case '<': return make_token(scanner_match('=') ? LESS_EQUAL : LESS);
+		case '>': return make_token(scanner_match('=') ? GREATER_EQUAL : GREATER);
+		case '"': return scanner_string();
 	}
 
 	return error_token("Unexpected character.");

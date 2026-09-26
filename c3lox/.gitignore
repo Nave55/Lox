@@ -1,6 +1,9 @@
-build/
 out/
+build/obj
 resources/*.txt
 .vscode
 .zed
 .c3fmt
+*.exe
+*.rdi
+*.pdb

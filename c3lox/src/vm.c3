@@ -86,9 +86,16 @@ fn void? vm_run() {
 	}
 }
 
-fn void? vm_interpret(String source) {
-	compile(source);
-	return;
+fn void? vm_interpret(char[] source) {
+	Chunk chunk;
+	chunk.init();
+
+	if (!compile(source, &chunk)) return COMPILE_ERROR~;
+
+	vm.chunk = &chunk;
+	vm.ip = 0;
+
+	return vm_run();
 }
 
 fn void vm_push(Value value) {
