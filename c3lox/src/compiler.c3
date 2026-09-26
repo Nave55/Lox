@@ -92,8 +92,8 @@ fn void emit_bytes(Uint8 byte1, Uint8 byte2) {
 }
 
 fn void compiler_number() {
-  double val = parser.previous.lexeme.to_double()!!;
-  emit_constant({ (ValueData) { .as_num = val }, NUMBER });
+	double val = parser.previous.lexeme.to_double()!!;
+	emit_constant({ (ValueData) { .as_num = val }, NUMBER });
 }
 
 fn ParseRule* get_rule(TokenType type) => type.rule;

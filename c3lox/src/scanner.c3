@@ -18,11 +18,11 @@ fn void scanner_init(char[] source) {
 	scanner.line = 1;
 }
 
-fn bool scanner_is_alpha(char c) {
+fn bool is_alpha(char c) {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
 
-fn bool scanner_is_digit(char c) => c >= '0' && c <= '9';
+fn bool is_digit(char c) => c >= '0' && c <= '9';
 fn bool scanner_is_at_end(sz off = 0) => scanner.current + off >= scanner.source.len;
 
 fn char scanner_advance() {
@@ -72,7 +72,8 @@ fn void scanner_skip_whitespace() {
 }
 
 fn TokenType check_keyword(sz start, sz length, String rest, TokenType type) {
-	if (scanner.current - scanner.start == start + length && scanner.source[scanner.start + start:length] == rest) {
+	if (scanner.current - scanner.start == start + length
+		&& scanner.source[scanner.start + start:length] == rest) {
 		return type;
 	}
 
@@ -113,16 +114,16 @@ fn TokenType scanner_identifier_type() {
 }
 
 fn Token scanner_identifier() {
-	while (scanner_is_alpha(scanner_peek()) || scanner_is_digit(scanner_peek())) scanner_advance();
+	while (is_alpha(scanner_peek()) || is_digit(scanner_peek())) scanner_advance();
 	return make_token(scanner_identifier_type());
 }
 
 fn Token scanner_number() {
-	while (scanner_is_digit(scanner_peek())) scanner_advance();
+	while (is_digit(scanner_peek())) scanner_advance();
 
-	if (scanner_peek() == '.' && scanner_is_digit(scanner_peek_next())) {
+	if (scanner_peek() == '.' && is_digit(scanner_peek_next())) {
 		scanner_advance();
-		while (scanner_is_digit(scanner_peek())) scanner_advance();
+		while (is_digit(scanner_peek())) scanner_advance();
 	}
 
 	return make_token(NUMBER);
@@ -150,8 +151,8 @@ fn Token scan_token() {
 	}
 
 	char c = scanner_advance();
-	if (scanner_is_alpha(c)) return scanner_identifier();
-	if (scanner_is_digit(c)) return scanner_number();
+	if (is_alpha(c)) return scanner_identifier();
+	if (is_digit(c)) return scanner_number();
 
 	switch (c) {
 		case '(': return make_token(LEFT_PAREN);

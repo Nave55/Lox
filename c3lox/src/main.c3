@@ -5,13 +5,15 @@ import std::os;
 
 fn void run_file(String path) => @pool() {
 	char[]? con = file::load_temp(path);
-	if (catch err = con) {
+	if (catch con) {
 		io::eprintfn("Could not open file '%s'", path);
 		os::exit(74);
-	} else {
-		vm_init();
-		if (try vm_interpret(con)) {
-		}
+	}
+
+	vm_init();
+	if (catch vm_err = vm_interpret(con)) {
+		if (vm_err == COMPILE_ERROR) os::exit(65);
+		if (vm_err == RUNTIME_ERROR) os::exit(65);
 	}
 }
 
