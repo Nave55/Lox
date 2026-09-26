@@ -34,9 +34,7 @@ fn Uint8 read_byte() {
 	return byte;
 }
 
-fn Value read_constant() {
-	return vm.chunk.constants.values[read_byte()];
-}
+fn Value read_constant() => vm.chunk.constants.values[read_byte()];
 
 fn void binary_op(BinaryFn f) {
 	double b = vm_pop().val.as_num;

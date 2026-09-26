@@ -29,7 +29,7 @@ fn void repl() => @pool() {
 		if (line == "exit") {
 			return;
 		}
-		io::printn(line);
+		compile(line);
 	}
 }
 

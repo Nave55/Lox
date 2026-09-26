@@ -80,7 +80,7 @@ fn bool is_alpha(char c) {
 }
 
 fn bool is_digit(char c) => c >= '0' && c <= '9';
-fn bool at_end() => scanner.current >= scanner.source.len - 1;
+fn bool is_at_end(sz off = 0) => scanner.current + off >= scanner.source.len;
 
 fn char advance() {
 	char c = scanner.source[scanner.current];
@@ -88,15 +88,18 @@ fn char advance() {
 	return c;
 }
 
-fn char peek() => scanner.source[scanner.current];
+fn char peek() {
+  if (is_at_end()) return '\0';
+  return scanner.source[scanner.current];
+}
 
 fn char peek_next() {
-	if (at_end()) return '\0';
+	if (is_at_end(1)) return '\0';
 	return scanner.source[scanner.current + 1];
 }
 
 fn bool match(char expected) {
-	if (at_end()) return false;
+	if (is_at_end()) return false;
 	if (scanner.source[scanner.current] != expected) return false;
 	scanner.current++;
 	return true;
@@ -131,7 +134,7 @@ fn void skip_whitespace() {
 				advance();
 			case '/':
 				if (peek_next() == '/') {
-					while (peek() != '\n' && !at_end()) advance();
+					while (peek() != '\n' && !is_at_end()) advance();
 				} else {
 					return;
 				}
@@ -141,9 +144,9 @@ fn void skip_whitespace() {
 	}
 }
 
-fn TokenType check_keyword(sz start, sz length, ZString rest, TokenType type) {
+fn TokenType check_keyword(sz start, sz length, String rest, TokenType type) {
 	if (scanner.current - scanner.start == start + length
-		&& scanner.source[scanner.start + start:length] == rest[:length]) {
+		&& scanner.source[scanner.start + start:length] == rest) {
 		return type;
 	}
 
@@ -207,7 +210,7 @@ fn Token string() {
 		}
 	}
 
-	if (at_end()) return error_token("Unterminated string.");
+	if (is_at_end()) return error_token("Unterminated string.");
 	advance();
 	return make_token(STRING);
 }
@@ -216,7 +219,7 @@ fn Token scan_token() {
 	skip_whitespace();
 	scanner.start = scanner.current;
 
-	if (at_end()) {
+	if (is_at_end()) {
 		return make_token(EOF);
 	}
 
