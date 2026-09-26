@@ -79,11 +79,8 @@ fn bool is_alpha(char c) {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
 
-fn bool is_digit(char c) {
-	return c >= '0' && c <= '9';
-}
-
-fn bool at_end(sz offset = 0) => scanner.current + offset >= scanner.source.len;
+fn bool is_digit(char c) => c >= '0' && c <= '9';
+fn bool at_end() => scanner.current >= scanner.source.len - 1;
 
 fn char advance() {
 	char c = scanner.source[scanner.current];
@@ -91,13 +88,10 @@ fn char advance() {
 	return c;
 }
 
-fn char peek() {
-	if (at_end()) return '\0';
-	return scanner.source[scanner.current];
-}
+fn char peek() => scanner.source[scanner.current];
 
 fn char peek_next() {
-	if (at_end(1)) return '\0';
+	if (at_end()) return '\0';
 	return scanner.source[scanner.current + 1];
 }
 
@@ -111,7 +105,7 @@ fn bool match(char expected) {
 fn Token make_token(TokenType type) {
 	Token token;
 	token.type = type;
-	token.lexeme = (String)scanner.source[scanner.start:scanner.current - scanner.start];
+	token.lexeme = (String)scanner.source[scanner.start..scanner.current - 1];
 	token.line = scanner.line;
 	return token;
 }
