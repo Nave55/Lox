@@ -1,5 +1,6 @@
 module c3lox;
 
+import types;
 import std::io;
 
 const STACK_MAX = 256;
@@ -39,13 +40,7 @@ fn Value read_constant() => vm.chunk.constants.values[read_byte()];
 fn void binary_op(BinaryFn f) {
 	double b = vm_pop().val.as_num;
 	double a = vm_pop().val.as_num;
-
-	vm_push(
-		{
-			(ValueData) { .as_num = f(a, b) },
-			NUMBER,
-		}
-	);
+	vm_push(@to_value(f(a, b)));
 }
 
 fn void? vm_run() {

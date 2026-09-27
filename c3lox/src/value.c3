@@ -1,5 +1,6 @@
 module c3lox;
 
+import types;
 import std::collections::list;
 
 enum ValueType : Uint8 {
@@ -42,8 +43,12 @@ macro @to_value(#val) {
 			return (Value) { (ValueData) { .as_num = #val }, NUMBER };
 		$case bool:
 			return (Value) { (ValueData) { .as_bool = #val }, BOOL };
-		$case string:
+		$case String:
 			return (Value) { (ValueData) { .as_str = #val }, STR };
+		$case ValueType:
+			$if #val == NIL:
+				return (Value) { (ValueData) { .as_num = 0d }, NIL };
+			$endif
 		$default:
 			(Value) { };
 	$endswitch

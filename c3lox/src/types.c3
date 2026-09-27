@@ -1,4 +1,4 @@
-module c3lox;
+module types;
 
 alias Uint8 = char; // uint8_t / char
 alias Int8 = ichar; // int8_t

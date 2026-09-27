@@ -1,5 +1,6 @@
 module c3lox;
 
+import types;
 import std::io;
 
 fn void Chunk.disassemble_chunk(Chunk* chunk, String name) {

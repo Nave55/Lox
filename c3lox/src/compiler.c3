@@ -1,5 +1,7 @@
 module c3lox;
 
+import scanner;
+import types;
 import std::io;
 
 const UINT8_MAX = 255;
@@ -31,6 +33,54 @@ struct ParseRule {
 	Precedence precedence;
 }
 
+enum Rule : Uint8 (ParseRule* rule) {
+	// Single-character tokens.
+	LEFT_PAREN    { &&{ &grouping, null, Precedence.NONE } },
+	RIGHT_PAREN   { &&{ null, null, Precedence.NONE } },
+	LEFT_BRACE    { &&{ null, null, Precedence.NONE } },
+	RIGHT_BRACE   { &&{ null, null, Precedence.NONE } },
+	COMMA         { &&{ null, null, Precedence.NONE } },
+	DOT           { &&{ null, null, Precedence.NONE } },
+	MINUS         { &&{ &unary, &binary, Precedence.TERM } },
+	PLUS          { &&{ null, &binary, Precedence.TERM } },
+	SEMICOLON     { &&{ null, null, Precedence.NONE } },
+	SLASH         { &&{ null, &binary, Precedence.FACTOR } },
+	STAR          { &&{ null, &binary, Precedence.FACTOR } },
+	// One or two character tokens.
+	BANG          { &&{ null, null, Precedence.NONE } },
+	BANG_EQUAL    { &&{ null, null, Precedence.NONE } },
+	EQUAL         { &&{ null, null, Precedence.NONE } },
+	EQUAL_EQUAL   { &&{ null, null, Precedence.NONE } },
+	GREATER       { &&{ null, null, Precedence.NONE } },
+	GREATER_EQUAL { &&{ null, null, Precedence.NONE } },
+	LESS          { &&{ null, null, Precedence.NONE } },
+	LESS_EQUAL    { &&{ null, null, Precedence.NONE } },
+	// Literals.
+	IDENTIFIER    { &&{ null, null, Precedence.NONE } },
+	STRING        { &&{ null, null, Precedence.NONE } },
+	NUMBER        { &&{ &number, null, Precedence.NONE } },
+	// Keywords.
+	AND           { &&{ null, null, Precedence.NONE } },
+	CLASS         { &&{ null, null, Precedence.NONE } },
+	ELSE          { &&{ null, null, Precedence.NONE } },
+	FALSE         { &&{ null, null, Precedence.NONE } },
+	FOR           { &&{ null, null, Precedence.NONE } },
+	FUN           { &&{ null, null, Precedence.NONE } },
+	IF            { &&{ null, null, Precedence.NONE } },
+	NIL           { &&{ null, null, Precedence.NONE } },
+	OR            { &&{ null, null, Precedence.NONE } },
+	PRINT         { &&{ null, null, Precedence.NONE } },
+	RETURN        { &&{ null, null, Precedence.NONE } },
+	SUPER         { &&{ null, null, Precedence.NONE } },
+	THIS          { &&{ null, null, Precedence.NONE } },
+	TRUE          { &&{ null, null, Precedence.NONE } },
+	VAR           { &&{ null, null, Precedence.NONE } },
+	WHILE         { &&{ null, null, Precedence.NONE } },
+	// rest
+	ERROR         { &&{ null, null, Precedence.NONE } },
+	EOF           { &&{ null, null, Precedence.NONE } },
+}
+
 Parser parser;
 Chunk* compiling_chunk;
 
@@ -56,20 +106,20 @@ fn void error_at(Token* token, String message) {
 fn void error(String message) => error_at(&parser.previous, message);
 fn void error_at_current(String message) => error_at(&parser.current, message);
 
-fn void compiler_advance() {
+fn void advance() {
 	parser.previous = parser.current;
 
 	for (;;) {
-		parser.current = scan_token();
+		parser.current = scanner::scan_token();
 		if (parser.current.type != ERROR) break;
 
 		error_at_current(parser.current.lexeme);
 	}
 }
 
-fn void compiler_consume(TokenType type, String message) {
+fn void consume(TokenType type, String message) {
 	if (parser.current.type == type) {
-		compiler_advance();
+		advance();
 		return;
 	}
 
@@ -91,15 +141,15 @@ fn void emit_bytes(Uint8 byte1, Uint8 byte2) {
 	emit_byte(byte2);
 }
 
-fn void compiler_number() {
+fn void number() {
 	double val = parser.previous.lexeme.to_double()!!;
-	emit_constant({ (ValueData) { .as_num = val }, NUMBER });
+	emit_constant(@to_value(val));
 }
 
-fn ParseRule* get_rule(TokenType type) => type.rule;
+fn ParseRule* get_rule(TokenType type) => ((Rule)type.ordinal).rule;
 
 fn void parse_precedence(Precedence precedence) {
-	compiler_advance();
+	advance();
 	ParseFn prefix_rule = get_rule(parser.previous.type).prefix;
 	if (prefix_rule == null) {
 		error("Expect expression.");
@@ -109,13 +159,13 @@ fn void parse_precedence(Precedence precedence) {
 	prefix_rule();
 
 	while (precedence <= get_rule(parser.current.type).precedence) {
-		compiler_advance();
+		advance();
 		ParseFn infix_rule = get_rule(parser.previous.type).infix;
 		infix_rule();
 	}
 }
 
-fn void compiler_unary() {
+fn void unary() {
 	TokenType operator_type = parser.previous.type;
 	parse_precedence(UNARY);
 
@@ -125,7 +175,7 @@ fn void compiler_unary() {
 	}
 }
 
-fn void compiler_binary() {
+fn void binary() {
 	TokenType operator_type = parser.previous.type;
 	ParseRule* rule         = get_rule(operator_type);
 	parse_precedence((Precedence)(rule.precedence.ordinal + 1));
@@ -139,13 +189,13 @@ fn void compiler_binary() {
 	}
 }
 
-fn void compiler_expression() {
+fn void expression() {
 	parse_precedence(ASSIGNMENT);
 }
 
-fn void compiler_grouping() {
-	compiler_expression();
-	compiler_consume(RIGHT_PAREN, "Expect ')' after compiler_expression.");
+fn void grouping() {
+	expression();
+	consume(RIGHT_PAREN, "Expect ')' after compiler_expression.");
 }
 
 fn Uint8 make_constant(Value value) {
@@ -163,15 +213,15 @@ fn void emit_constant(Value value) {
 }
 
 fn bool compile(char[] source, Chunk* chunk) {
-	scanner_init(source);
+	scanner::init(source);
 	compiling_chunk = chunk;
 
 	parser.had_error = false;
 	parser.panic_mode = false;
 
-	compiler_advance();
-	compiler_expression();
-	compiler_consume(EOF, "Expect end of compiler_expression.");
+	advance();
+	expression();
+	consume(EOF, "Expect end of compiler_expression.");
 	end_compiler();
 	return !parser.had_error;
 }
