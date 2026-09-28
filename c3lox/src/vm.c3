@@ -19,13 +19,19 @@ fn void vm_init() {
 	vm_reset_stack();
 }
 
-fn void vm_free() {
-}
-
 fn void vm_reset_stack() {
 	vm.stack_top = 0;
 	vm.ip = 0;
 	vm.chunk = null;
+}
+
+fn void runtime_error(String format, args...) {
+	io::eprintfn(format, args);
+
+	sz instruction = vm.ip - 1;
+	sz line        = vm.chunk.lines[instruction];
+	io::eprintfn("[line %d] in script", line);
+	vm_reset_stack();
 }
 
 fn Uint8 read_byte() {
@@ -36,10 +42,32 @@ fn Uint8 read_byte() {
 
 fn Value read_constant() => vm.chunk.constants[read_byte()];
 
-fn void binary_op(BinaryFn f) {
-	double b = vm_pop().val.as_num;
-	double a = vm_pop().val.as_num;
-	vm_push(@to_value(f(a, b)));
+macro binary_fn(a, b, $op) {
+	$switch ($op):
+		$case '+':
+			return a + b;
+		$case '-':
+			return a - b;
+		$case '*':
+			return a * b;
+		$case '/':
+			return a / b;
+		$case '>':
+			return a > b;
+		$case '<':
+			return a < b;
+	$endswitch
+}
+
+macro void? @binary_op(#value_type, $op) {
+	if (!is_num(peek(0)) || !is_num(peek(1))) {
+		runtime_error("Operands must be numbers.");
+		return RUNTIME_ERROR~;
+	}
+
+	double b = pop().val.as_num;
+	double a = pop().val.as_num;
+	push(#value_type(binary_fn(a, b, $op)));
 }
 
 fn void? vm_run() {
@@ -57,30 +85,44 @@ fn void? vm_run() {
 
 		Uint8 instruction = read_byte();
 		switch (instruction) {
-			case Op.CONSTANT.ordinal:
+			case Op.CONSTANT:
 				Value constant = read_constant();
-				vm_push(constant);
+				push(constant);
 
-			case Op.ADD.ordinal: binary_op(fn (a, b) => a + b);
-			case Op.SUBTRACT.ordinal: binary_op(fn (a, b) => a - b);
-			case Op.MULTIPLY.ordinal: binary_op(fn (a, b) => a * b);
-			case Op.DIVIDE.ordinal: binary_op(fn (a, b) => a / b);
+			case Op.NIL: push(@to_value(ValueType.NIL));
+			case Op.TRUE: push(@to_value(true));
+			case Op.FALSE: push(@to_value(false));
+			case Op.EQUAL:
 
-			case Op.NEGATE.ordinal:
-				Value value = vm_pop();
-				if (value.tag != NUMBER) return RUNTIME_ERROR~;
-				value.val.as_num = -value.val.as_num;
-				vm_push(value);
+				{
+					Value b = pop();
+					Value a = pop();
+					push(@to_value(values_equal(a, b)));
+				}
 
-			case Op.RETURN.ordinal:
-				print_value(vm_pop());
+			case Op.GREATER: @binary_op(@to_value, '>')!;
+			case Op.LESS: @binary_op(@to_value, '<')!;
+			case Op.ADD: @binary_op(@to_value, '+')!;
+			case Op.SUBTRACT: @binary_op(@to_value, '-')!;
+			case Op.MULTIPLY: @binary_op(@to_value, '*')!;
+			case Op.DIVIDE: @binary_op(@to_value, '/')!;
+			case Op.NOT: push(@to_value(is_falsey(pop())));
+
+			case Op.NEGATE:
+				if (!is_num(peek(0))) {
+					runtime_error("Operand must be a number");
+					return RUNTIME_ERROR~;
+				}
+				push(@to_value(-as_num(pop())));
+			case Op.RETURN:
+				print_value(pop());
 				io::printn();
 				return;
 		}
 	}
 }
 
-fn void? vm_interpret(char[] source) {
+fn void? interpret(char[] source) {
 	Chunk chunk;
 	chunk.init();
 
@@ -92,12 +134,20 @@ fn void? vm_interpret(char[] source) {
 	return vm_run();
 }
 
-fn void vm_push(Value value) {
+fn void push(Value value) {
 	vm.stack[vm.stack_top] = value;
 	vm.stack_top++;
 }
 
-fn Value vm_pop() {
+fn Value pop() {
 	vm.stack_top--;
 	return vm.stack[vm.stack_top];
+}
+
+fn Value peek(sz distance) {
+	return vm.stack[vm.stack_top - distance - 1];
+}
+
+fn bool is_falsey(Value value) {
+	return is_nil(value) || (is_bool(value) && !as_bool(value));
 }

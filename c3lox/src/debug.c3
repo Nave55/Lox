@@ -20,20 +20,20 @@ fn sz Chunk.disassemble_instruction(Chunk* chunk, sz offset) {
 
 	Uint8 instruction = chunk.code[offset];
 	switch (instruction) {
-		case Op.CONSTANT.ordinal:
-			return chunk.constant_instruction("CONSTANT", offset);
-		case Op.ADD.ordinal:
-			return simple_instruction("ADD", offset);
-		case Op.SUBTRACT.ordinal:
-			return simple_instruction("SUBTRACT", offset);
-		case Op.MULTIPLY.ordinal:
-			return simple_instruction("MULTIPLY", offset);
-		case Op.DIVIDE.ordinal:
-			return simple_instruction("DIVIDE", offset);
-		case Op.NEGATE.ordinal:
-			return simple_instruction("NEGATE", offset);
-		case Op.RETURN.ordinal:
-			return simple_instruction("RETURN", offset);
+		case Op.CONSTANT: return chunk.constant_instruction("CONSTANT", offset);
+		case Op.NIL: return simple_instruction("NIL", offset);
+		case Op.TRUE: return simple_instruction("TRUE", offset);
+		case Op.FALSE: return simple_instruction("FALSE", offset);
+		case Op.EQUAL: return simple_instruction("EQUAL", offset);
+		case Op.GREATER: return simple_instruction("GREATER", offset);
+		case Op.LESS: return simple_instruction("LESS", offset);
+		case Op.ADD: return simple_instruction("ADD", offset);
+		case Op.SUBTRACT: return simple_instruction("SUBTRACT", offset);
+		case Op.MULTIPLY: return simple_instruction("MULTIPLY", offset);
+		case Op.DIVIDE: return simple_instruction("DIVIDE", offset);
+		case Op.NOT: return simple_instruction("NOT", offset);
+		case Op.NEGATE: return simple_instruction("NEGATE", offset);
+		case Op.RETURN: return simple_instruction("RETURN", offset);
 		default:
 			io::printf("Unknown opcode %s\n", instruction);
 			return offset + 1;

@@ -32,48 +32,50 @@ struct ParseRule {
 	Precedence precedence;
 }
 
-enum Rule : Uint8 (ParseRule* rule) {
-	LEFT_PAREN    { &&{ &grouping, null, Precedence.NONE } },
-	RIGHT_PAREN   { &&{ null, null, Precedence.NONE } },
-	LEFT_BRACE    { &&{ null, null, Precedence.NONE } },
-	RIGHT_BRACE   { &&{ null, null, Precedence.NONE } },
-	COMMA         { &&{ null, null, Precedence.NONE } },
-	DOT           { &&{ null, null, Precedence.NONE } },
-	MINUS         { &&{ &unary, &binary, Precedence.TERM } },
-	PLUS          { &&{ null, &binary, Precedence.TERM } },
-	SEMICOLON     { &&{ null, null, Precedence.NONE } },
-	SLASH         { &&{ null, &binary, Precedence.FACTOR } },
-	STAR          { &&{ null, &binary, Precedence.FACTOR } },
-	BANG          { &&{ null, null, Precedence.NONE } },
-	BANG_EQUAL    { &&{ null, null, Precedence.NONE } },
-	EQUAL         { &&{ null, null, Precedence.NONE } },
-	EQUAL_EQUAL   { &&{ null, null, Precedence.NONE } },
-	GREATER       { &&{ null, null, Precedence.NONE } },
-	GREATER_EQUAL { &&{ null, null, Precedence.NONE } },
-	LESS          { &&{ null, null, Precedence.NONE } },
-	LESS_EQUAL    { &&{ null, null, Precedence.NONE } },
-	IDENTIFIER    { &&{ null, null, Precedence.NONE } },
-	STRING        { &&{ null, null, Precedence.NONE } },
-	NUMBER        { &&{ &number, null, Precedence.NONE } },
-	AND           { &&{ null, null, Precedence.NONE } },
-	CLASS         { &&{ null, null, Precedence.NONE } },
-	ELSE          { &&{ null, null, Precedence.NONE } },
-	FALSE         { &&{ null, null, Precedence.NONE } },
-	FOR           { &&{ null, null, Precedence.NONE } },
-	FUN           { &&{ null, null, Precedence.NONE } },
-	IF            { &&{ null, null, Precedence.NONE } },
-	NIL           { &&{ null, null, Precedence.NONE } },
-	OR            { &&{ null, null, Precedence.NONE } },
-	PRINT         { &&{ null, null, Precedence.NONE } },
-	RETURN        { &&{ null, null, Precedence.NONE } },
-	SUPER         { &&{ null, null, Precedence.NONE } },
-	THIS          { &&{ null, null, Precedence.NONE } },
-	TRUE          { &&{ null, null, Precedence.NONE } },
-	VAR           { &&{ null, null, Precedence.NONE } },
-	WHILE         { &&{ null, null, Precedence.NONE } },
-	ERROR         { &&{ null, null, Precedence.NONE } },
-	EOF           { &&{ null, null, Precedence.NONE } },
-}
+// c3fmt off
+const ParseRule*[*] RULE = {
+	[TokenType.LEFT_PAREN]    = &&{ &grouping, null,    Precedence.NONE },
+	[TokenType.RIGHT_PAREN]   = &&{ null,      null,    Precedence.NONE },
+	[TokenType.LEFT_BRACE]    = &&{ null,      null,    Precedence.NONE },
+	[TokenType.RIGHT_BRACE]   = &&{ null,      null,    Precedence.NONE },
+	[TokenType.COMMA]         = &&{ null,      null,    Precedence.NONE },
+	[TokenType.DOT]           = &&{ null,      null,    Precedence.NONE },
+	[TokenType.MINUS]         = &&{ &unary,    &binary, Precedence.TERM },
+	[TokenType.PLUS]          = &&{ null,      &binary, Precedence.TERM },
+	[TokenType.SEMICOLON]     = &&{ null,      null,    Precedence.NONE },
+	[TokenType.SLASH]         = &&{ null,      &binary, Precedence.FACTOR },
+	[TokenType.STAR]          = &&{ null,      &binary, Precedence.FACTOR },
+	[TokenType.BANG]          = &&{ &unary,    null,    Precedence.NONE },
+	[TokenType.BANG_EQUAL]    = &&{ null,      &binary, Precedence.EQUALITY },
+	[TokenType.EQUAL]         = &&{ null,      null,    Precedence.NONE },
+	[TokenType.EQUAL_EQUAL]   = &&{ null,      &binary, Precedence.EQUALITY },
+	[TokenType.GREATER]       = &&{ null,      &binary, Precedence.COMPARISON },
+	[TokenType.GREATER_EQUAL] = &&{ null,      &binary, Precedence.COMPARISON },
+	[TokenType.LESS]          = &&{ null,      &binary, Precedence.COMPARISON },
+	[TokenType.LESS_EQUAL]    = &&{ null,      &binary, Precedence.COMPARISON },
+	[TokenType.IDENTIFIER]    = &&{ null,      null,    Precedence.NONE },
+	[TokenType.STRING]        = &&{ null,      null,    Precedence.NONE },
+	[TokenType.NUMBER]        = &&{ &number,   null,    Precedence.NONE },
+	[TokenType.AND]           = &&{ null,      null,    Precedence.NONE },
+	[TokenType.CLASS]         = &&{ null,      null,    Precedence.NONE },
+	[TokenType.ELSE]          = &&{ null,      null,    Precedence.NONE },
+	[TokenType.FALSE]         = &&{ &literal,  null,    Precedence.NONE },
+	[TokenType.FOR]           = &&{ null,      null,    Precedence.NONE },
+	[TokenType.FUN]           = &&{ null,      null,    Precedence.NONE },
+	[TokenType.IF]            = &&{ null,      null,    Precedence.NONE },
+	[TokenType.NIL]           = &&{ &literal,  null,    Precedence.NONE },
+	[TokenType.OR]            = &&{ null,      null,    Precedence.NONE },
+	[TokenType.PRINT]         = &&{ null,      null,    Precedence.NONE },
+	[TokenType.RETURN]        = &&{ null,      null,    Precedence.NONE },
+	[TokenType.SUPER]         = &&{ null,      null,    Precedence.NONE },
+	[TokenType.THIS]          = &&{ null,      null,    Precedence.NONE },
+	[TokenType.TRUE]          = &&{ &literal,  null,    Precedence.NONE },
+	[TokenType.VAR]           = &&{ null,      null,    Precedence.NONE },
+	[TokenType.WHILE]         = &&{ null,      null,    Precedence.NONE },
+	[TokenType.ERROR]         = &&{ null,      null,    Precedence.NONE },
+	[TokenType.EOF]           = &&{ null,      null,    Precedence.NONE },
+};
+// c3fmt on
 
 Parser parser;
 Chunk* chunk @local = null;
@@ -91,7 +93,7 @@ fn void error_at(Token* token, String message) {
 		io::eprintf(" at '%s'", token.lexeme);
 	}
 
-	io::eprintf(": %s\n", message);
+	io::eprintfn(": %s", message);
 	parser.had_error = true;
 }
 
@@ -119,8 +121,8 @@ fn void consume(TokenType type, String message) {
 }
 
 fn void emit_byte(Uint8 byte) => chunk.write(byte, parser.previous.line);
-fn void emit_return() => emit_byte(Op.RETURN.ordinal);
-fn ParseRule* get_rule(TokenType type) => ((Rule)type.ordinal).rule;
+fn void emit_return() => emit_byte(Op.RETURN);
+fn ParseRule* get_rule(TokenType type) => RULE[type];
 
 fn void emit_bytes(Uint8 byte1, Uint8 byte2) {
 	emit_byte(byte1);
@@ -161,7 +163,8 @@ fn void unary() {
 	parse_precedence(UNARY);
 
 	switch (operator_type) {
-		case MINUS: emit_byte(Op.NEGATE.ordinal);
+		case BANG: emit_byte(Op.NOT);
+		case MINUS: emit_byte(Op.NEGATE);
 		default: return;
 	}
 }
@@ -172,11 +175,26 @@ fn void binary() {
 	parse_precedence((Precedence)(rule.precedence.ordinal + 1));
 
 	switch (operator_type) {
-		case PLUS: emit_byte(Op.ADD.ordinal);
-		case MINUS: emit_byte(Op.SUBTRACT.ordinal);
-		case STAR: emit_byte(Op.MULTIPLY.ordinal);
-		case SLASH: emit_byte(Op.DIVIDE.ordinal);
+		case BANG_EQUAL: emit_bytes(Op.EQUAL, Op.NOT);
+		case EQUAL_EQUAL: emit_byte(Op.EQUAL);
+		case GREATER: emit_byte(Op.GREATER);
+		case GREATER_EQUAL: emit_bytes(Op.LESS, Op.NOT);
+		case LESS: emit_byte(Op.LESS);
+		case LESS_EQUAL: emit_bytes(Op.GREATER, Op.NOT);
+		case PLUS: emit_byte(Op.ADD);
+		case MINUS: emit_byte(Op.SUBTRACT);
+		case STAR: emit_byte(Op.MULTIPLY);
+		case SLASH: emit_byte(Op.DIVIDE);
 		default: return;
+	}
+}
+
+fn void literal() {
+	switch (parser.previous.type) {
+		case FALSE: emit_byte(Op.FALSE); break;
+		case NIL: emit_byte(Op.NIL); break;
+		case TRUE: emit_byte(Op.TRUE); break;
+		default: return;  // Unreachable.
 	}
 }
 
@@ -200,7 +218,7 @@ fn Uint8 make_constant(Value value) {
 }
 
 fn void emit_constant(Value value) {
-	emit_bytes(Op.CONSTANT.ordinal, make_constant(value));
+	emit_bytes(Op.CONSTANT, make_constant(value));
 }
 
 fn bool compile(char[] source, Chunk* new_chunk) {

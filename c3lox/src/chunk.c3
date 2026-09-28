@@ -2,12 +2,22 @@ module c3lox;
 
 import std::collections::list;
 
-// c3fmt off
-enum Op : Uint8 {
-	CONSTANT, SUBTRACT, ADD,    MULTIPLY,
-	DIVIDE,   NEGATE,   RETURN,
+constdef Op : inline Uint8 {
+	CONSTANT = 0,
+	NIL,
+	TRUE,
+	FALSE,
+	EQUAL,
+	GREATER,
+	LESS,
+	ADD,
+	SUBTRACT,
+	MULTIPLY,
+	DIVIDE,
+	NOT,
+	NEGATE,
+	RETURN,
 }
-// c3fmt on
 
 struct Chunk {
 	List{Uint8} code;
