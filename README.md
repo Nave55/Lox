@@ -34,5 +34,5 @@ A pure, persistent-structure implementation of jLox.
 A VM interpreter modeled after cLox, implemented in **C3**.
 
 ### Notes
-- Trying to use as idiomatic c3 code as I can, so it does diverge from clox
+- Trying to use as idiomatic C3 code as I can, so it does diverge from clox
 
