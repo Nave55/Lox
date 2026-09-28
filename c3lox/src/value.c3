@@ -2,18 +2,12 @@ module c3lox;
 
 import std::collections::list;
 
+// c3fmt off
 enum ValueType : Uint8 {
-	BOOL,
-	NUMBER,
-	NIL,
-	STR,
-	FUNC,
-	NATIVE,
-	CLOSURE,
-	CLASS,
-	INSTANCE,
-	BOUND
+	BOOL,   NUMBER,  NIL,   STR,      FUNC, 
+	NATIVE, CLOSURE, CLASS, INSTANCE, BOUND
 }
+// c3fmt onn
 
 union ValueData {
 	bool as_bool;
