@@ -1,6 +1,5 @@
 module c3lox;
 
-import types;
 import std::collections::list;
 
 enum Op : Uint8 {

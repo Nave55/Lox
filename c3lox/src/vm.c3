@@ -1,6 +1,5 @@
 module c3lox;
 
-import types;
 import std::io;
 
 const STACK_MAX = 256;

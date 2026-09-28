@@ -1,7 +1,6 @@
 module c3lox;
 
 import scanner;
-import types;
 import std::io;
 
 const UINT8_MAX = 255;
@@ -34,7 +33,6 @@ struct ParseRule {
 }
 
 enum Rule : Uint8 (ParseRule* rule) {
-	// Single-character tokens.
 	LEFT_PAREN    { &&{ &grouping, null, Precedence.NONE } },
 	RIGHT_PAREN   { &&{ null, null, Precedence.NONE } },
 	LEFT_BRACE    { &&{ null, null, Precedence.NONE } },
@@ -46,7 +44,6 @@ enum Rule : Uint8 (ParseRule* rule) {
 	SEMICOLON     { &&{ null, null, Precedence.NONE } },
 	SLASH         { &&{ null, &binary, Precedence.FACTOR } },
 	STAR          { &&{ null, &binary, Precedence.FACTOR } },
-	// One or two character tokens.
 	BANG          { &&{ null, null, Precedence.NONE } },
 	BANG_EQUAL    { &&{ null, null, Precedence.NONE } },
 	EQUAL         { &&{ null, null, Precedence.NONE } },
@@ -55,11 +52,9 @@ enum Rule : Uint8 (ParseRule* rule) {
 	GREATER_EQUAL { &&{ null, null, Precedence.NONE } },
 	LESS          { &&{ null, null, Precedence.NONE } },
 	LESS_EQUAL    { &&{ null, null, Precedence.NONE } },
-	// Literals.
 	IDENTIFIER    { &&{ null, null, Precedence.NONE } },
 	STRING        { &&{ null, null, Precedence.NONE } },
 	NUMBER        { &&{ &number, null, Precedence.NONE } },
-	// Keywords.
 	AND           { &&{ null, null, Precedence.NONE } },
 	CLASS         { &&{ null, null, Precedence.NONE } },
 	ELSE          { &&{ null, null, Precedence.NONE } },
@@ -76,15 +71,12 @@ enum Rule : Uint8 (ParseRule* rule) {
 	TRUE          { &&{ null, null, Precedence.NONE } },
 	VAR           { &&{ null, null, Precedence.NONE } },
 	WHILE         { &&{ null, null, Precedence.NONE } },
-	// rest
 	ERROR         { &&{ null, null, Precedence.NONE } },
 	EOF           { &&{ null, null, Precedence.NONE } },
 }
 
 Parser parser;
-Chunk* compiling_chunk;
-
-fn Chunk* current_chunk() => compiling_chunk;
+Chunk* chunk @local = null;
 
 fn void error_at(Token* token, String message) {
 	if (parser.panic_mode) return;
@@ -126,27 +118,26 @@ fn void consume(TokenType type, String message) {
 	error_at_current(message);
 }
 
-fn void emit_byte(Uint8 byte) => current_chunk().write(byte, parser.previous.line);
+fn void emit_byte(Uint8 byte) => chunk.write(byte, parser.previous.line);
 fn void emit_return() => emit_byte(Op.RETURN.ordinal);
-
-fn void end_compiler() {
-	emit_return();
-	$if $feat(DEBUG_PRINT_CODE):
-		if (!parser.had_error) current_chunk().disassemble_chunk("code");
-	$endif
-}
+fn ParseRule* get_rule(TokenType type) => ((Rule)type.ordinal).rule;
 
 fn void emit_bytes(Uint8 byte1, Uint8 byte2) {
 	emit_byte(byte1);
 	emit_byte(byte2);
 }
 
+fn void end_compiler() {
+	emit_return();
+	$if $feat(DEBUG_PRINT_CODE):
+		if (!parser.had_error) chunk.disassemble_chunk("code");
+	$endif
+}
+
 fn void number() {
 	double val = parser.previous.lexeme.to_double()!!;
 	emit_constant(@to_value(val));
 }
-
-fn ParseRule* get_rule(TokenType type) => ((Rule)type.ordinal).rule;
 
 fn void parse_precedence(Precedence precedence) {
 	advance();
@@ -199,7 +190,7 @@ fn void grouping() {
 }
 
 fn Uint8 make_constant(Value value) {
-	sz constant = current_chunk().add_constant(value);
+	sz constant = chunk.add_constant(value);
 	if (constant > UINT8_MAX) {
 		error("Too many constants in one chunk.");
 		return 0;
@@ -212,9 +203,9 @@ fn void emit_constant(Value value) {
 	emit_bytes(Op.CONSTANT.ordinal, make_constant(value));
 }
 
-fn bool compile(char[] source, Chunk* chunk) {
+fn bool compile(char[] source, Chunk* new_chunk) {
 	scanner::init(source);
-	compiling_chunk = chunk;
+	chunk = new_chunk;
 
 	parser.had_error = false;
 	parser.panic_mode = false;

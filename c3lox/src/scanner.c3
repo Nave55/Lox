@@ -1,9 +1,8 @@
 module scanner;
 
-import types;
 import std::io;
 
-enum TokenType : Uint8 {
+enum TokenType : char {
 	// Single-character tokens.
 	LEFT_PAREN,
 	RIGHT_PAREN,
