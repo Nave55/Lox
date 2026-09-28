@@ -48,7 +48,7 @@ fn sz simple_instruction(String name, sz offset) {
 fn sz Chunk.constant_instruction(Chunk* chunk, String name, sz offset) {
 	Uint8 constant = chunk.code[offset + 1];
 	io::printf("%-16s %4d '", name, constant);
-	print_value(chunk.constants.values[constant]);
+	print_value(chunk.constants[constant]);
 	io::printf("'\n");
 	return offset + 2;
 }

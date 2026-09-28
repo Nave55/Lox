@@ -32,9 +32,7 @@ struct Value {
 	ValueType tag;
 }
 
-struct ValueArray {
-	List{Value} values;
-}
+alias ValueArray = List{Value};
 
 macro @to_value(#val) {
 	$switch $Typeof(#val):
@@ -53,18 +51,9 @@ macro @to_value(#val) {
 	$endswitch
 }
 
-fn void ValueArray.tinit(ValueArray* array) {
-	array.values.tinit();
-}
-
 fn sz ValueArray.write(ValueArray* array, Value val) {
-	sz count = array.values.size;
-	array.values.push(val);
+	sz count = array.size;
+	array.push(val);
 
 	return count;
-}
-
-// only use if allocated without tmem
-fn void ValueArray.free(ValueArray* array) {
-	array.values.free();
 }

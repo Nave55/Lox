@@ -17,20 +17,22 @@ fn void run_file(String path) => @pool() {
 	}
 }
 
-fn void repl() => @pool() {
+fn void repl() {
 	io::printn("-----------------------------------------");
 	io::printn("                 LOX REPL                ");
 	io::printn("-----------------------------------------");
 
 	for (;;) {
-		io::printf(">>> ");
-		String line = io::treadline()!!;
-		if (line == "exit" || line == ":q" || line == "quit") {
-			return;
-		}
+		@pool() {
+			io::printf(">>> ");
+			String line = io::treadline()!!;
+			if (line == "exit" || line == ":q" || line == "quit") {
+				return;
+			}
 
-		if (try vm_interpret(line)) {
-		}
+			if (try vm_interpret(line)) {
+			}
+		};
 	}
 }
 
