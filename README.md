@@ -17,11 +17,11 @@ Implementation of Lox from the book **Crafting Interpreters**
 
 ## hlox (Haskell jLox)
 
-A pure, persistent-structure implementation of jLox.
+A pure, persistent-structure implementation of jLox. \
 To run type `cabal run Hlox -- "file.lox` with the file path being optional.
 
 ### Notes
-- I am **Not** an expert haskell developer so there are probably lots of mistakes and non idiomatic code
+- I am **Not** an expert haskell developer so there are probably lots of mistakes and non idiomatic code 
 - Cabal Project
 - Added `+=` operator
 - Implemented proper `for` statement
@@ -31,7 +31,7 @@ To run type `cabal run Hlox -- "file.lox` with the file path being optional.
 
 ## c3lox (C3 cLox)
 
-A byte code interpreter modeled after cLox, implemented in **C3**.
+A byte code interpreter modeled after cLox, implemented in **C3**. \
 To run type `c3c run -q -D DEBUG_TRACE_EXECUTION -D DEBUG_PRINT_CODE -- "file.lox"` with the defines and file path being optional
 
 ### Notes
