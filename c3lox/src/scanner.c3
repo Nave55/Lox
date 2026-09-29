@@ -176,11 +176,11 @@ fn Token number() {
 }
 
 fn Token string() {
-	while (peek() != '"') {
-		if (peek() == '\n') {
-			scanner.line++;
-			advance();
-		}
+	for (;;) {
+		char val = peek();
+		if (val == '"' || val == '\0') break;
+		if (val == '\n') scanner.line++;
+		advance();
 	}
 
 	if (is_at_end()) return error_token("Unterminated string.");

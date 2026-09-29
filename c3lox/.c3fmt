@@ -1,0 +1,6 @@
+brace_style: K&R
+tab_size: 4
+indent_width: 4
+max_line_length: 100
+newline_at_eof: true
+else_on_newline: false

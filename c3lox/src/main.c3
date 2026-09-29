@@ -23,6 +23,10 @@ fn void repl() {
 		@pool() {
 			io::printf(">>> ");
 			String line = io::treadline()!!;
+			if (line == "cls") {
+				io::print("\x1b[H\x1b[2J");
+				continue;
+			}
 			if (line == ":q" || line == "exit") return;
 			@catch(interpret(line));
 		};

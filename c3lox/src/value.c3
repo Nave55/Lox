@@ -9,25 +9,13 @@ enum ValueType : Uint8 {
 	BOOL,
 	NUMBER,
 	NIL,
-	STR,
-	FUNC,
-	NATIVE,
-	CLOSURE,
-	CLASS,
-	INSTANCE,
-	BOUND
+	OBJ,
 }
 
 union ValueData {
 	bool as_bool;
 	double as_num;
-	String as_str;
-	// Func*   as_func;
-	// Native* as_native;
-	// Closure* as_closure;
-	// Class* as_class;
-	// Instance* as_instance;
-	// BoundMethod* as_bound;
+	Obj* as_obj;
 }
 
 struct Value {
@@ -44,51 +32,19 @@ fn sz ValueArray.write(ValueArray* array, Value val) {
 	return count;
 }
 
-macro @to_value(#val) {
-	$switch $Typeof(#val):
-		$case double:
-			return (Value) { (ValueData) { .as_num = #val }, NUMBER };
-		$case bool:
-			return (Value) { (ValueData) { .as_bool = #val }, BOOL };
-		$case String:
-			return (Value) { (ValueData) { .as_str = #val }, STR };
-		$case ValueType:
-			$if #val == NIL:
-				return (Value) { (ValueData) { .as_num = 0d }, NIL };
-			$endif
-		$default:
-			io::printn("@to_value - HIT DEFAULT");
-			(Value) { };
-	$endswitch
-}
+macro number_val(v) => (Value) { (ValueData) { .as_num = v }, NUMBER };
+macro bool_val(v) => (Value) { (ValueData) { .as_bool = v }, BOOL };
+macro nil_val() => (Value) { (ValueData) { .as_num = 0 }, NIL };
+macro obj_val(v) => (Value) { (ValueData) { .as_obj = v }, OBJ };
 
-macro is_num(v) {
-	return v.tag == NUMBER;
-}
+macro is_num(v) => v.tag == NUMBER;
+macro is_bool(v) => v.tag == BOOL;
+macro is_nil(v) => v.tag == NIL;
+macro is_obj(v) => v.tag == OBJ;
 
-macro is_bool(v) {
-	return v.tag == BOOL;
-}
-
-macro is_str(v) {
-	return v.tag == STR;
-}
-
-macro is_nil(v) {
-	return v.tag == NIL;
-}
-
-macro as_num(v) {
-	return v.val.as_num;
-}
-
-macro as_bool(v) {
-	return v.val.as_bool;
-}
-
-macro as_str(v) {
-	return v.val.as_str;
-}
+macro as_num(v) => v.val.as_num;
+macro as_bool(v) => v.val.as_bool;
+macro as_obj(v) => v.val.as_obj;
 
 fn bool values_equal(Value a, Value b) {
 	if (a.tag != b.tag) return false;
@@ -96,6 +52,7 @@ fn bool values_equal(Value a, Value b) {
 		case BOOL: return as_bool(a) == as_bool(b);
 		case NIL: return true;
 		case NUMBER: return (as_num(a) - as_num(b)) < 1e-9;
+		case OBJ: return as_string(a).equals(as_string(b));
 		default: return false;  // Unreachable.
 	}
 }

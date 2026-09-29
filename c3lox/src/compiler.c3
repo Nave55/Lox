@@ -54,7 +54,7 @@ const ParseRule*[*] RULE = {
 	[TokenType.LESS]          = &&{ null,      &binary, Precedence.COMPARISON },
 	[TokenType.LESS_EQUAL]    = &&{ null,      &binary, Precedence.COMPARISON },
 	[TokenType.IDENTIFIER]    = &&{ null,      null,    Precedence.NONE },
-	[TokenType.STRING]        = &&{ null,      null,    Precedence.NONE },
+	[TokenType.STRING]        = &&{ &string,   null,    Precedence.NONE },
 	[TokenType.NUMBER]        = &&{ &number,   null,    Precedence.NONE },
 	[TokenType.AND]           = &&{ null,      null,    Precedence.NONE },
 	[TokenType.CLASS]         = &&{ null,      null,    Precedence.NONE },
@@ -138,7 +138,14 @@ fn void end_compiler() {
 
 fn void number() {
 	double val = parser.previous.lexeme.to_double()!!;
-	emit_constant(@to_value(val));
+	emit_constant(number_val(val));
+}
+
+fn void string() {
+	sz len       = parser.previous.lexeme.len;
+	String inner = parser.previous.lexeme[1..^2];
+	Obj* c       = allocate_string(inner);
+	emit_constant(obj_val(c));
 }
 
 fn void parse_precedence(Precedence precedence) {

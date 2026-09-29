@@ -55,13 +55,9 @@ fn sz Chunk.constant_instruction(Chunk* chunk, String name, sz offset) {
 
 fn void print_value(Value val) {
 	switch (val.tag) {
-		case NUMBER:
-			io::printf("%g", val.val.as_num);
-		case BOOL:
-			io::printf("%s", val.val.as_bool);
-		case STR:
-			io::printf("%s", val.val.as_str);
-		default:
-			io::printf("DEFAULT");
+		case NUMBER: io::printf("%g", val.val.as_num);
+		case BOOL: io::printf("%s", val.val.as_bool);
+		case OBJ: print_object(val);
+		default: io::printf("DEFAULT");
 	}
 }
