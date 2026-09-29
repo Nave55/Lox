@@ -25,12 +25,16 @@ runRepl = do
       hFlush stdout
       line <- getLine
 
-      if line == ":q" || line == "exit"
-        then pure ()
-        else do
-          (interp', outs) <- interpRun interp line
-          mapM_ BS.putStrLn outs
-          loop interp'
+      case line of
+              v | v == ":q" || v == "exit" -> pure ()
+              "cls" -> do
+                putStr "\ESC[2J\ESC[H"
+                hFlush stdout
+                loop interp
+              _ -> do
+                (interp', outs) <- interpRun interp line
+                mapM_ BS.putStrLn outs
+                loop interp'
 
 main :: IO ()
 main = do
