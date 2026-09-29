@@ -32,7 +32,8 @@ To run type `cabal run Hlox -- "file.lox` with the file path being optional.
 ## c3lox (C3 cLox)
 
 A byte code interpreter modeled after cLox, implemented in **C3**. \
-To run type `c3c run -q -D DEBUG_TRACE_EXECUTION -D DEBUG_PRINT_CODE -- "file.lox"` with the defines and file path being optional
+To run type `c3c run -- "file.lox"` with the file path being optional \
+Optional defines are `DEBUG_TRACE_EXECUTION` and `DEBUG_PRINT_CODE` that can be added using the `-D` compiler flag
 
 ### Notes
 - Trying to use as idiomatic C3 code as I can, so it does diverge from clox. If you want a c3 version as c-like as possible then look at this repo https://github.com/worky68/c3lox
