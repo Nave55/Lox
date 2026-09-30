@@ -2,7 +2,7 @@ module c3lox;
 
 import std::collections::list;
 
-constdef Op : inline Uint8 {
+constset Op : inline Uint8 {
 	CONSTANT = 0,
 	NIL,
 	TRUE,
@@ -26,9 +26,9 @@ struct Chunk {
 }
 
 fn void Chunk.init(Chunk* chunk) {
-	chunk.code.tinit();
-	chunk.lines.tinit();
-	chunk.constants.tinit();
+	chunk.code.tinit(64);
+	chunk.lines.tinit(64);
+	chunk.constants.tinit(64);
 }
 
 fn void Chunk.write(Chunk* chunk, Uint8 byte, sz line) {

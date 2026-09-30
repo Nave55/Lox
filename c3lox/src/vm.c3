@@ -18,7 +18,7 @@ Vm vm;
 
 fn void vm_init() {
 	vm_reset_stack();
-	vm.objects.tinit();
+	vm.objects.tinit(64);
 }
 
 fn void vm_reset_stack() {

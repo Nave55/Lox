@@ -2,8 +2,8 @@ module c3lox;
 
 import std::io;
 
-constdef ObjType : inline Uint8 {
-	STRING,
+constset ObjType : inline Uint8 {
+	STRING = 0,
 	FUNC,
 	NATIVE,
 	CLOSURE,

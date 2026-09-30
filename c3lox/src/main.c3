@@ -10,15 +10,15 @@ fn void run_file(String path) => @pool() {
 		os::exit(74);
 	}
 
-	vm_init();
+  vm_init();
 	interpret(con) ?? os::exit(65);
 }
 
-fn void repl() {
+fn void repl() => @pool() {
+  vm_init();
 	io::printn("-----------------------------------------");
 	io::printn("                 LOX REPL                ");
 	io::printn("-----------------------------------------");
-
 	for (;;) {
 		@pool() {
 			io::printf(">>> ");
