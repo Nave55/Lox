@@ -17,10 +17,11 @@ Implementation of Lox from the book **Crafting Interpreters**
 
 ## hlox (Haskell jLox)
 
-A pure, persistent-structure implementation of jLox.
+A pure, persistent-structure implementation of jLox. \
+To run type `cabal run Hlox -- "file.lox` with the file path being optional.
 
 ### Notes
-- I am **Not** an expert haskell developer so there are probably lots of mistakes and non idiomatic code
+- I am **Not** an expert haskell developer so there are probably lots of mistakes and non idiomatic code 
 - Cabal Project
 - Added `+=` operator
 - Implemented proper `for` statement
@@ -30,8 +31,12 @@ A pure, persistent-structure implementation of jLox.
 
 ## c3lox (C3 cLox)
 
-A byte code interpreter modeled after cLox, implemented in **C3**.
+A byte code interpreter modeled after cLox, implemented in **C3**. \
+To run type `c3c run -- "file.lox"` with the file path being optional \
+Optional defines are `DEBUG_TRACE_EXECUTION` and `DEBUG_PRINT_CODE` that can be added using the `-D` compiler flag
 
 ### Notes
-- Trying to use as idiomatic C3 code as I can, so it does diverge from clox
+- Trying to use as idiomatic C3 code as I can, so it does diverge from clox. If you want a c3 version as c-like as possible then look at this repo https://github.com/worky68/c3lox
+- Going to avoid using pointer arithmetic and data structures like linked lists
+- Data Structures that don't need to be gc will be allocated using temp allocator and cleaned up after interpreter leaves scope
 
