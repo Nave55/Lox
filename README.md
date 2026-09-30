@@ -13,7 +13,7 @@ Implementation of Lox from the book **Crafting Interpreters**
 - ✅ hlox
 - ❌ c3lox 
 
-- Currently working on **Chapter 20**
+- Currently working on **Chapter 21**
 
 ## hlox (Haskell jLox)
 
@@ -39,4 +39,5 @@ Optional defines are `DEBUG_TRACE_EXECUTION` and `DEBUG_PRINT_CODE` that can be 
 - Trying to use as idiomatic C3 code as I can, so it does diverge from clox. If you want a c3 version as c-like as possible then look at this repo https://github.com/worky68/c3lox
 - Going to avoid using pointer arithmetic and data structures like linked lists
 - Data Structures that don't need to be gc will be allocated using temp allocator and cleaned up after interpreter leaves scope
+- Skipped chapter 20 since I'm using `DString` and not `char*` for obj strings
 
