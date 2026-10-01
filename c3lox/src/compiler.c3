@@ -191,7 +191,7 @@ fn void parse_precedence(Precedence precedence) {
 }
 
 fn Uint8 identifier_constant(Token* name) {
-	return make_constant(obj_val(allocate_string(name.lexeme)));
+	return make_constant(obj_val(allocate_ident(name.lexeme)));
 }
 
 fn Uint8 parse_variable(String error_message) {
@@ -323,9 +323,7 @@ fn Uint8 make_constant(Value value) {
 	return (Uint8)constant;
 }
 
-fn void emit_constant(Value value) {
-	emit_bytes(Op.CONSTANT, make_constant(value));
-}
+fn void emit_constant(Value value) => emit_bytes(Op.CONSTANT, make_constant(value));
 
 fn bool compile(char[] source, Chunk* new_chunk) {
 	scanner::init(source);

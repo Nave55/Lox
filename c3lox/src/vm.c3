@@ -47,7 +47,8 @@ fn Uint8 read_byte() {
 }
 
 fn Value read_constant() => vm.chunk.constants[read_byte()];
-fn DString read_string() => as_string(read_constant());
+fn DString read_dstring() => as_string(read_constant());
+fn String read_ident() => as_ident(read_constant());
 
 // c3fmt off
 macro binary_fn(a, b, $op) {
@@ -96,22 +97,22 @@ fn void? vm_run() {
 			case Op.FALSE: push(bool_val(false));
 			case Op.POP: pop();
 			case Op.GET_GLOBAL:
-				DString name = read_string();
-				Value? value = vm.globals.get(name.str_view());
+				String name = read_ident();
+				Value? value = vm.globals.get(name);
 				if (catch value) {
-					runtime_error("Undefined variable '%s'.", name.str_view());
+					runtime_error("Undefined variable '%s'.", name);
 					return RUNTIME_ERROR~;
 				}
 				push(value);
 			case Op.DEFINE_GLOBAL:
-				DString name = read_string();
-				vm.globals.set(name.str_view(), peek(0));
+				String name = read_ident();
+				vm.globals.set(name, peek(0));
 				pop();
 			case Op.SET_GLOBAL:
-				DString name = read_string();
-				if (!vm.globals.set(name.str_view(), peek(0))) {
-					vm.globals.remove(name.str_view());
-					runtime_error("Undefined variable '%s'.", name.str_view());
+				String name = read_ident();
+				if (!vm.globals.set(name, peek(0))) {
+					vm.globals.remove(name);
+					runtime_error("Undefined variable '%s'.", name);
 					return RUNTIME_ERROR~;
 				}
 			case Op.EQUAL:

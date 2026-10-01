@@ -12,6 +12,7 @@ fn void run_file(String path) => @pool() {
 
 	vm_init();
 	interpret(con) ?? os::exit(65);
+	io::printn(vm.objects.len());
 }
 
 fn void repl() {
