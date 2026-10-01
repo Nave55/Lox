@@ -20,7 +20,7 @@ Vm vm;
 
 fn void vm_init() {
 	vm_reset_stack();
-	vm.objects.tinit(16);
+	vm.objects.tinit(32);
 	vm.globals.tinit(16);
 }
 
@@ -107,14 +107,14 @@ fn void? vm_run() {
 				DString name = read_string();
 				vm.globals.set(name.str_view(), peek(0));
 				pop();
-      case Op.SET_GLOBAL:
-        DString name = read_string();
-        if (!vm.globals.set(name.str_view(), peek(0))) {
-          vm.globals.remove(name.str_view());
-          runtime_error("Undefined variable '%s'.", name.str_view());
-          return RUNTIME_ERROR~;
-        }
-      case Op.EQUAL:
+			case Op.SET_GLOBAL:
+				DString name = read_string();
+				if (!vm.globals.set(name.str_view(), peek(0))) {
+					vm.globals.remove(name.str_view());
+					runtime_error("Undefined variable '%s'.", name.str_view());
+					return RUNTIME_ERROR~;
+				}
+			case Op.EQUAL:
 				Value b = pop();
 				Value a = pop();
 				push(bool_val(values_equal(a, b)));
@@ -175,10 +175,7 @@ fn Value pop() {
 }
 
 fn Value peek(sz distance) => vm.stack[vm.stack_top - distance - 1];
-
-fn bool is_falsey(Value value) {
-	return is_nil(value) || (is_bool(value) && !as_bool(value));
-}
+fn bool is_falsey(Value value) => is_nil(value) || (is_bool(value) && !as_bool(value));
 
 fn void concatenate() {
 	DString b = as_string(pop());

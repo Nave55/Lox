@@ -158,13 +158,13 @@ fn void string(bool can_assign) {
 
 fn void named_variable(Token name, bool can_assign) {
 	Uint8 arg = identifier_constant(&name);
-    if (can_assign && match(EQUAL)) {
-        expression();
-        emit_bytes(Op.SET_GLOBAL, arg);
-      } else {
-        emit_bytes(Op.GET_GLOBAL, arg);
-    }
-  }
+	if (can_assign && match(EQUAL)) {
+		expression();
+		emit_bytes(Op.SET_GLOBAL, arg);
+	} else {
+		emit_bytes(Op.GET_GLOBAL, arg);
+	}
+}
 
 fn void variable(bool can_assign) => named_variable(parser.previous, can_assign);
 
@@ -178,16 +178,16 @@ fn void parse_precedence(Precedence precedence) {
 
 	bool can_assign = precedence <= ASSIGNMENT;
 	prefix_rule(can_assign);
-	
+
 	while (precedence <= get_rule(parser.current.type).precedence) {
 		advance();
 		ParseFn infix_rule = get_rule(parser.previous.type).infix;
 		infix_rule(can_assign);
 	}
 
-  if (can_assign && match(EQUAL)) {
-    error("Invalid assignment target.");
-  }
+	if (can_assign && match(EQUAL)) {
+		error("Invalid assignment target.");
+	}
 }
 
 fn Uint8 identifier_constant(Token* name) {
@@ -219,19 +219,21 @@ fn void binary(bool can_assign) {
 	ParseRule* rule         = get_rule(operator_type);
 	parse_precedence((Precedence)(rule.precedence.ordinal + 1));
 
+	// c3fmt off
 	switch (operator_type) {
-		case BANG_EQUAL: emit_bytes(Op.EQUAL, Op.NOT);
-		case EQUAL_EQUAL: emit_byte(Op.EQUAL);
-		case GREATER: emit_byte(Op.GREATER);
+		case BANG_EQUAL:    emit_bytes(Op.EQUAL, Op.NOT);
+		case EQUAL_EQUAL:   emit_byte(Op.EQUAL);
+		case GREATER:       emit_byte(Op.GREATER);
 		case GREATER_EQUAL: emit_bytes(Op.LESS, Op.NOT);
-		case LESS: emit_byte(Op.LESS);
-		case LESS_EQUAL: emit_bytes(Op.GREATER, Op.NOT);
-		case PLUS: emit_byte(Op.ADD);
-		case MINUS: emit_byte(Op.SUBTRACT);
-		case STAR: emit_byte(Op.MULTIPLY);
-		case SLASH: emit_byte(Op.DIVIDE);
-		default: return;
+		case LESS:          emit_byte(Op.LESS);
+		case LESS_EQUAL:    emit_bytes(Op.GREATER, Op.NOT);
+		case PLUS:          emit_byte(Op.ADD);
+		case MINUS:         emit_byte(Op.SUBTRACT);
+		case STAR:          emit_byte(Op.MULTIPLY);
+		case SLASH:         emit_byte(Op.DIVIDE);
+		default:            return;
 	}
+	// c3fmt on
 }
 
 fn void literal(bool can_assign) {
