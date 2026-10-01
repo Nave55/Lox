@@ -7,6 +7,10 @@ constset Op : inline Uint8 {
 	NIL,
 	TRUE,
 	FALSE,
+	POP,
+	GET_GLOBAL,
+  SET_GLOBAL,
+	DEFINE_GLOBAL,
 	EQUAL,
 	GREATER,
 	LESS,
@@ -16,6 +20,7 @@ constset Op : inline Uint8 {
 	DIVIDE,
 	NOT,
 	NEGATE,
+	PRINT,
 	RETURN,
 }
 
@@ -26,9 +31,9 @@ struct Chunk {
 }
 
 fn void Chunk.init(Chunk* chunk) {
-	chunk.code.tinit(64);
-	chunk.lines.tinit(64);
-	chunk.constants.tinit(64);
+	chunk.code.tinit(16);
+	chunk.lines.tinit(16);
+	chunk.constants.tinit(16);
 }
 
 fn void Chunk.write(Chunk* chunk, Uint8 byte, sz line) {

@@ -10,12 +10,10 @@ fn void run_file(String path) => @pool() {
 		os::exit(74);
 	}
 
-  vm_init();
 	interpret(con) ?? os::exit(65);
 }
 
-fn void repl() => @pool() {
-  vm_init();
+fn void repl() {
 	io::printn("-----------------------------------------");
 	io::printn("                 LOX REPL                ");
 	io::printn("-----------------------------------------");
@@ -34,6 +32,7 @@ fn void repl() => @pool() {
 }
 
 fn int main(String[] args) {
+	vm_init();
 	if (args.len == 1) {
 		repl();
 	} else if (args.len == 2) {

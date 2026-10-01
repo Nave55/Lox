@@ -20,10 +20,14 @@ fn sz Chunk.disassemble_instruction(Chunk* chunk, sz offset) {
 
 	Uint8 instruction = chunk.code[offset];
 	switch (instruction) {
-		case Op.CONSTANT: return chunk.constant_instruction("CONSTANT", offset);
+		case Op.CONSTANT: return constant_instruction("CONSTANT", chunk, offset);
 		case Op.NIL: return simple_instruction("NIL", offset);
 		case Op.TRUE: return simple_instruction("TRUE", offset);
 		case Op.FALSE: return simple_instruction("FALSE", offset);
+		case Op.POP: return simple_instruction("POP", offset);
+		case Op.GET_GLOBAL: return constant_instruction("GET_GLOBAL", chunk, offset);
+		case Op.DEFINE_GLOBAL: return constant_instruction("DEFINE_GLOBAL", chunk, offset);
+    case Op.SET_GLOBAL: return constant_instruction("SET_GLOBAL", chunk, offset);
 		case Op.EQUAL: return simple_instruction("EQUAL", offset);
 		case Op.GREATER: return simple_instruction("GREATER", offset);
 		case Op.LESS: return simple_instruction("LESS", offset);
@@ -33,6 +37,7 @@ fn sz Chunk.disassemble_instruction(Chunk* chunk, sz offset) {
 		case Op.DIVIDE: return simple_instruction("DIVIDE", offset);
 		case Op.NOT: return simple_instruction("NOT", offset);
 		case Op.NEGATE: return simple_instruction("NEGATE", offset);
+		case Op.PRINT: return simple_instruction("PRINT", offset);
 		case Op.RETURN: return simple_instruction("RETURN", offset);
 		default:
 			io::printf("Unknown opcode %s\n", instruction);
@@ -45,7 +50,7 @@ fn sz simple_instruction(String name, sz offset) {
 	return offset + 1;
 }
 
-fn sz Chunk.constant_instruction(Chunk* chunk, String name, sz offset) {
+fn sz constant_instruction(String name, Chunk* chunk, sz offset) {
 	Uint8 constant = chunk.code[offset + 1];
 	io::printf("%-16s %4d '", name, constant);
 	print_value(chunk.constants[constant]);

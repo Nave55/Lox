@@ -2,6 +2,7 @@ module c3lox;
 
 import std::io;
 import std::collections::list;
+import std::collections::map;
 
 excuse COMPILE_ERROR, RUNTIME_ERROR;
 const STACK_MAX = 256;
@@ -9,6 +10,7 @@ const STACK_MAX = 256;
 struct Vm {
 	Value[STACK_MAX] stack;
 	List{Obj*} objects;
+	HashMap{String, Value} globals;
 	Chunk* chunk;
 	sz ip;
 	sz stack_top;
@@ -18,7 +20,8 @@ Vm vm;
 
 fn void vm_init() {
 	vm_reset_stack();
-	vm.objects.tinit(64);
+	vm.objects.tinit(16);
+	vm.globals.tinit(16);
 }
 
 fn void vm_reset_stack() {
@@ -44,6 +47,7 @@ fn Uint8 read_byte() {
 }
 
 fn Value read_constant() => vm.chunk.constants[read_byte()];
+fn DString read_string() => as_string(read_constant());
 
 // c3fmt off
 macro binary_fn(a, b, $op) {
@@ -87,15 +91,33 @@ fn void? vm_run() {
 			case Op.CONSTANT:
 				Value constant = read_constant();
 				push(constant);
-
 			case Op.NIL: push(nil_val());
 			case Op.TRUE: push(bool_val(true));
 			case Op.FALSE: push(bool_val(false));
-			case Op.EQUAL:
+			case Op.POP: pop();
+			case Op.GET_GLOBAL:
+				DString name = read_string();
+				Value? value = vm.globals.get(name.str_view());
+				if (catch value) {
+					runtime_error("Undefined variable '%s'.", name.str_view());
+					return RUNTIME_ERROR~;
+				}
+				push(value);
+			case Op.DEFINE_GLOBAL:
+				DString name = read_string();
+				vm.globals.set(name.str_view(), peek(0));
+				pop();
+      case Op.SET_GLOBAL:
+        DString name = read_string();
+        if (!vm.globals.set(name.str_view(), peek(0))) {
+          vm.globals.remove(name.str_view());
+          runtime_error("Undefined variable '%s'.", name.str_view());
+          return RUNTIME_ERROR~;
+        }
+      case Op.EQUAL:
 				Value b = pop();
 				Value a = pop();
 				push(bool_val(values_equal(a, b)));
-
 			case Op.GREATER: @binary_op(bool_val, '>')!;
 			case Op.LESS: @binary_op(bool_val, '<')!;
 			case Op.ADD:
@@ -111,16 +133,16 @@ fn void? vm_run() {
 			case Op.MULTIPLY: @binary_op(number_val, '*')!;
 			case Op.DIVIDE: @binary_op(number_val, '/')!;
 			case Op.NOT: push(bool_val(is_falsey(pop())));
-
 			case Op.NEGATE:
 				if (!is_num(peek(0))) {
 					runtime_error("Operand must be a number");
 					return RUNTIME_ERROR~;
 				}
 				push(number_val(-as_num(pop())));
-			case Op.RETURN:
+			case Op.PRINT:
 				print_value(pop());
 				io::printn();
+			case Op.RETURN:
 				return;
 		}
 	}
@@ -138,7 +160,7 @@ fn void? interpret(char[] source) {
 	// fault err = @catch(vm_run());
 	// free_vm();
 	// return err~;
-	
+
 	return vm_run();
 }
 

@@ -10,4 +10,4 @@ alias Uint64 = ulong; // uint64_t
 alias Int64 = long; // long long
 
 alias BinaryFn = fn double(double, double);
-alias ParseFn = fn void();
+alias ParseFn = fn void(bool);

@@ -53,7 +53,7 @@ const ParseRule*[*] RULE = {
 	[TokenType.GREATER_EQUAL] = &&{ null,      &binary, Precedence.COMPARISON },
 	[TokenType.LESS]          = &&{ null,      &binary, Precedence.COMPARISON },
 	[TokenType.LESS_EQUAL]    = &&{ null,      &binary, Precedence.COMPARISON },
-	[TokenType.IDENTIFIER]    = &&{ null,      null,    Precedence.NONE },
+	[TokenType.IDENTIFIER]    = &&{ &variable, null,    Precedence.NONE },
 	[TokenType.STRING]        = &&{ &string,   null,    Precedence.NONE },
 	[TokenType.NUMBER]        = &&{ &number,   null,    Precedence.NONE },
 	[TokenType.AND]           = &&{ null,      null,    Precedence.NONE },
@@ -120,6 +120,14 @@ fn void consume(TokenType type, String message) {
 	error_at_current(message);
 }
 
+fn bool check(TokenType type) => parser.current.type == type;
+
+fn bool match(TokenType type) {
+	if (!check(type)) return false;
+	advance();
+	return true;
+}
+
 fn void emit_byte(Uint8 byte) => chunk.write(byte, parser.previous.line);
 fn void emit_return() => emit_byte(Op.RETURN);
 fn ParseRule* get_rule(TokenType type) => RULE[type];
@@ -136,17 +144,29 @@ fn void end_compiler() {
 	$endif
 }
 
-fn void number() {
+fn void number(bool can_assign) {
 	double val = parser.previous.lexeme.to_double()!!;
 	emit_constant(number_val(val));
 }
 
-fn void string() {
+fn void string(bool can_assign) {
 	sz len       = parser.previous.lexeme.len;
 	String inner = parser.previous.lexeme[1..^2];
 	Obj* c       = allocate_string(inner);
 	emit_constant(obj_val(c));
 }
+
+fn void named_variable(Token name, bool can_assign) {
+	Uint8 arg = identifier_constant(&name);
+    if (can_assign && match(EQUAL)) {
+        expression();
+        emit_bytes(Op.SET_GLOBAL, arg);
+      } else {
+        emit_bytes(Op.GET_GLOBAL, arg);
+    }
+  }
+
+fn void variable(bool can_assign) => named_variable(parser.previous, can_assign);
 
 fn void parse_precedence(Precedence precedence) {
 	advance();
@@ -156,16 +176,34 @@ fn void parse_precedence(Precedence precedence) {
 		return;
 	}
 
-	prefix_rule();
-
+	bool can_assign = precedence <= ASSIGNMENT;
+	prefix_rule(can_assign);
+	
 	while (precedence <= get_rule(parser.current.type).precedence) {
 		advance();
 		ParseFn infix_rule = get_rule(parser.previous.type).infix;
-		infix_rule();
+		infix_rule(can_assign);
 	}
+
+  if (can_assign && match(EQUAL)) {
+    error("Invalid assignment target.");
+  }
 }
 
-fn void unary() {
+fn Uint8 identifier_constant(Token* name) {
+	return make_constant(obj_val(allocate_string(name.lexeme)));
+}
+
+fn Uint8 parse_variable(String error_message) {
+	consume(IDENTIFIER, error_message);
+	return identifier_constant(&parser.previous);
+}
+
+fn void define_variable(Uint8 global) {
+	emit_bytes(Op.DEFINE_GLOBAL, global);
+}
+
+fn void unary(bool can_assign) {
 	TokenType operator_type = parser.previous.type;
 	parse_precedence(UNARY);
 
@@ -176,7 +214,7 @@ fn void unary() {
 	}
 }
 
-fn void binary() {
+fn void binary(bool can_assign) {
 	TokenType operator_type = parser.previous.type;
 	ParseRule* rule         = get_rule(operator_type);
 	parse_precedence((Precedence)(rule.precedence.ordinal + 1));
@@ -196,7 +234,7 @@ fn void binary() {
 	}
 }
 
-fn void literal() {
+fn void literal(bool can_assign) {
 	switch (parser.previous.type) {
 		case FALSE: emit_byte(Op.FALSE); break;
 		case NIL: emit_byte(Op.NIL); break;
@@ -205,11 +243,70 @@ fn void literal() {
 	}
 }
 
-fn void expression() {
-	parse_precedence(ASSIGNMENT);
+fn void expression() => parse_precedence(ASSIGNMENT);
+
+fn void expression_statement() {
+	expression();
+	consume(SEMICOLON, "Expect ';' after expression.");
+	emit_byte(Op.POP);
 }
 
-fn void grouping() {
+fn void var_declaration() {
+	Uint8 global = parse_variable("Expect variable name.");
+
+	if (match(EQUAL)) {
+		expression();
+	} else {
+		emit_byte(Op.NIL);
+	}
+	consume(SEMICOLON, "Expect ';' after variable declaration.");
+	define_variable(global);
+}
+
+fn void print_statement() {
+	expression();
+	consume(SEMICOLON, "Expect ';' after value.");
+	emit_byte(Op.PRINT);
+}
+
+fn void synchronize() {
+	parser.panic_mode = false;
+
+	while (parser.current.type != EOF) {
+		if (parser.previous.type == SEMICOLON) return;
+		switch (parser.current.type) {
+			case CLASS:
+			case FUN:
+			case VAR:
+			case FOR:
+			case IF:
+			case WHILE:
+			case PRINT:
+			case RETURN: return;
+			default:
+		}
+
+		advance();
+	}
+}
+fn void declaration() {
+	if (match(VAR)) {
+		var_declaration();
+	} else {
+		statement();
+	}
+	if (parser.panic_mode) synchronize();
+}
+
+fn void statement() {
+	if (match(PRINT)) {
+		print_statement();
+	} else {
+		expression_statement();
+	}
+}
+
+fn void grouping(bool can_assign) {
 	expression();
 	consume(RIGHT_PAREN, "Expect ')' after compiler_expression.");
 }
@@ -236,8 +333,9 @@ fn bool compile(char[] source, Chunk* new_chunk) {
 	parser.panic_mode = false;
 
 	advance();
-	expression();
-	consume(EOF, "Expect end of compiler_expression.");
+	while (!match(EOF)) {
+		declaration();
+	}
 	end_compiler();
 	return !parser.had_error;
 }

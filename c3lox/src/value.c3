@@ -52,7 +52,11 @@ fn bool values_equal(Value a, Value b) {
 		case BOOL: return as_bool(a) == as_bool(b);
 		case NIL: return true;
 		case NUMBER: return (as_num(a) - as_num(b)) < 1e-9;
-		case OBJ: return as_string(a).equals(as_string(b));
-		default: return false;  // Unreachable.
+		case OBJ:
+			switch (as_obj(a).tag) {
+				case STRING: return as_string(a).equals(as_string(b));
+			}
 	}
+
+	return false;
 }
