@@ -22,13 +22,21 @@ fn void vm_init() {
 	vm_reset_stack();
 	vm.objects.tinit(32);
 	vm.globals.tinit(16);
+	vm.chunk = null;
+	vm.ip = 0;
+	vm.stack_top = 0;
 }
 
 fn void vm_reset_stack() {
 	vm.stack_top = 0;
 	vm.ip = 0;
-	vm.chunk = null;
-	vm.objects.clear();
+}
+
+fn void vm_reset() {
+  vm_reset_stack();
+  vm.globals.clear();
+  vm.objects.clear();
+  vm.chunk = null;
 }
 
 fn void runtime_error(String format, args...) {
@@ -150,13 +158,12 @@ fn void? vm_run() {
 }
 
 fn void? interpret(char[] source) {
+  vm_reset_stack();
 	Chunk chunk;
 	chunk.init();
+	vm.chunk = &chunk;
 
 	if (!compile(source, &chunk)) return COMPILE_ERROR~;
-
-	vm.chunk = &chunk;
-	vm.ip = 0;
 
 	// fault err = @catch(vm_run());
 	// free_vm();

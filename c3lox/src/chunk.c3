@@ -1,6 +1,7 @@
 module c3lox;
 
 import std::collections::list;
+import std::collections::map;
 
 constset Op : inline Uint8 {
 	CONSTANT = 0,
@@ -28,12 +29,14 @@ struct Chunk {
 	List{Uint8} code;
 	List{sz} lines;
 	ValueArray constants;
+	HashMap{String, Uint8} idents;
 }
 
 fn void Chunk.init(Chunk* chunk) {
 	chunk.code.tinit(32);
 	chunk.lines.tinit(16);
 	chunk.constants.tinit(32);
+	chunk.idents.tinit(16);
 }
 
 fn void Chunk.write(Chunk* chunk, Uint8 byte, sz line) {

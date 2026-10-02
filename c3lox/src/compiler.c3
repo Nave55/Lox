@@ -191,7 +191,12 @@ fn void parse_precedence(Precedence precedence) {
 }
 
 fn Uint8 identifier_constant(Token* name) {
-	return make_constant(obj_val(allocate_ident(name.lexeme)));
+	Uint8? val = vm.chunk.idents.get(name.lexeme);
+	if (try val) return val;
+	
+	Uint8 idx = make_constant(obj_val(allocate_ident(name.lexeme)));
+	vm.chunk.idents.set(name.lexeme, idx);
+	return idx;
 }
 
 fn Uint8 parse_variable(String error_message) {
