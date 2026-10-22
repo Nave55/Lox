@@ -1,6 +1,7 @@
 module c3lox;
 
 import std::io;
+import std::collections::map;
 
 enum Precedence : Uint8 {
 	NONE,
@@ -36,6 +37,7 @@ struct Local {
 
 struct Compiler {
 	Local[UINT8_COUNT] locals;
+  HashMap{String, sz} idents;
 	sz locals_count;
 	sz scope_depth;
 
@@ -45,6 +47,7 @@ struct Compiler {
 }
 
 fn void Compiler.init(Compiler* compiler, char[] source) {
+  compiler.idents.clear();
 	compiler.scanner.init(source);
 	compiler.locals_count = 0;
 	compiler.scope_depth = 0;
@@ -209,12 +212,10 @@ fn bool identifiers_equal(LoxToken* a, LoxToken* b) {
 }
 
 fn sz Compiler.resolve_local(Compiler* compiler, LoxToken* name) {
-	for (sz i = compiler.locals_count - 1; i >= 0; i--) {
-		Local* local = &compiler.locals[i];
-		if (identifiers_equal(name, &local.name)) {
-			if (local.depth == -1) {
+  sz? i = compiler.idents[name.lexeme];
+  if (try i) {
+		if (compiler.locals[i].depth == -1) {
 				compiler.error("Can't read local variable in its own initializer.");
-			}
 		}
 		return i;
 	}
@@ -226,6 +227,7 @@ fn void Compiler.add_local(Compiler* compiler, LoxToken name) {
 		compiler.error("Too man local variables in functions");
 		return;
 	}
+	compiler.idents[name.lexeme] = compiler.locals_count;
 	Local* local = &compiler.locals[compiler.locals_count++];
 	local.name = name;
 	local.depth = -1;
@@ -466,4 +468,3 @@ const ParseRule*[*] RULE = {
 	[TokenType.EOF]           = &&{ null,      null,    Precedence.NONE },
 };
 // c3fmt on
-

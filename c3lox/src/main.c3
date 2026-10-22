@@ -17,7 +17,7 @@ fn void run_file(String path) => @pool() {
 }
 
 fn void repl() => @pool() {
-  Vm vm;
+	Vm vm;
 	vm.init();
 
 	io::printn("-----------------------------------------");
