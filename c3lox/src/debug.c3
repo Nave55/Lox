@@ -28,7 +28,7 @@ fn sz Chunk.disassemble_instruction(Chunk* chunk, sz offset) {
 		case Op.POP:           return simple_instruction("POP", offset);
 		case Op.GET_GLOBAL:    return constant_instruction("GET_GLOBAL", chunk, offset);
 		case Op.DEFINE_GLOBAL: return constant_instruction("DEFINE_GLOBAL", chunk, offset);
-    case Op.SET_GLOBAL:    return constant_instruction("SET_GLOBAL", chunk, offset);
+        case Op.SET_GLOBAL:    return constant_instruction("SET_GLOBAL", chunk, offset);
 		case Op.EQUAL:         return simple_instruction("EQUAL", offset);
 		case Op.GREATER:       return simple_instruction("GREATER", offset);
 		case Op.LESS:          return simple_instruction("LESS", offset);
