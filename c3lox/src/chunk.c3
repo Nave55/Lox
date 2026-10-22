@@ -1,7 +1,6 @@
 module c3lox;
 
 import std::collections::list;
-import std::collections::map;
 
 constset Op : inline Uint8 {
 	CONSTANT = 0,
