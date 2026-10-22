@@ -37,7 +37,7 @@ struct Local {
 
 struct Compiler {
 	Local[UINT8_COUNT] locals;
-  HashMap{String, sz} idents;
+  	HashMap{String, sz} idents;
 	sz locals_count;
 	sz scope_depth;
 
