@@ -18,6 +18,7 @@ struct Vm {
 
 Vm vm;
 
+// allocations
 fn void vm_init() {
 	vm_reset_stack();
 	vm.objects.tinit(32);
@@ -33,10 +34,10 @@ fn void vm_reset_stack() {
 }
 
 fn void vm_reset() {
-  vm_reset_stack();
-  vm.globals.clear();
-  vm.objects.clear();
-  vm.chunk = null;
+	vm_reset_stack();
+	vm.globals.clear();
+	vm.objects.clear();
+	vm.chunk = null;
 }
 
 fn void runtime_error(String format, args...) {
@@ -158,9 +159,9 @@ fn void? vm_run() {
 }
 
 fn void? interpret(char[] source) {
-  vm_reset_stack();
+	vm_reset_stack();
 	Chunk chunk;
-	chunk.init();
+	chunk.init(); // allocation
 	vm.chunk = &chunk;
 
 	if (!compile(source, &chunk)) return COMPILE_ERROR~;

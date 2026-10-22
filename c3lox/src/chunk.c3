@@ -32,6 +32,7 @@ struct Chunk {
 	HashMap{String, Uint8} idents;
 }
 
+// ** allocations **
 fn void Chunk.init(Chunk* chunk) {
 	chunk.code.tinit(32);
 	chunk.lines.tinit(16);

@@ -1,4 +1,4 @@
-module scanner;
+module c3lox;
 
 import std::io;
 
@@ -8,56 +8,54 @@ enum TokenType : char {
 	LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, RIGHT_BRACE,
 	COMMA,      DOT,         MINUS,      PLUS,
 	SEMICOLON,  SLASH,       STAR,
-	
-	// One or two character tokens.
+
+	// One or two character tokens
 	BANG,    BANG_EQUAL,    EQUAL, EQUAL_EQUAL,
 	GREATER, GREATER_EQUAL, LESS,  LESS_EQUAL,
-	
-	// Literals.
+
+	// Literals
 	IDENTIFIER, STRING, NUMBER,
-	
-	// Keywords.
+
+	// Keywords
 	AND,  CLASS, ELSE,   FALSE,
 	FOR,  FUN,   IF,     NIL,
 	OR,   PRINT, RETURN, SUPER,
 	THIS, TRUE,  VAR,    WHILE,
-	
+
 	ERROR, EOF,
 }
 // c3fmt on
 
-struct Token {
+struct LoxToken {
 	TokenType type;
 	String lexeme;
 	sz line;
 }
 
-struct Scanner {
+struct LoxScanner {
 	char[] source;
 	sz start;
 	sz current;
 	sz line;
 }
 
-Scanner scanner;
-
-fn Token make_token(TokenType type) {
-	Token token;
+fn LoxToken LoxScanner.make_token(LoxScanner* scanner, TokenType type) {
+	LoxToken token;
 	token.type = type;
 	token.lexeme = (String)scanner.source[scanner.start..scanner.current - 1];
 	token.line = scanner.line;
 	return token;
 }
 
-fn Token error_token(String message) {
-	Token token;
+fn LoxToken LoxScanner.error_token(LoxScanner* scanner, String message) {
+	LoxToken token;
 	token.type = ERROR;
 	token.lexeme = message;
 	token.line = scanner.line;
 	return token;
 }
 
-fn void init(char[] source) {
+fn void LoxScanner.init(LoxScanner* scanner, char[] source) {
 	scanner.source = source;
 	scanner.start = 0;
 	scanner.current = 0;
@@ -69,55 +67,69 @@ fn bool is_alpha(char c) {
 }
 
 fn bool is_digit(char c) => c >= '0' && c <= '9';
-fn bool is_at_end(sz off = 0) => scanner.current + off >= scanner.source.len;
 
-fn char advance() {
+fn bool LoxScanner.is_at_end(LoxScanner* scanner, sz off = 0) {
+	return scanner.current + off >= scanner.source.len;
+}
+
+fn char LoxScanner.advance(LoxScanner* scanner) {
 	char c = scanner.source[scanner.current];
 	scanner.current++;
 	return c;
 }
 
-fn char peek() {
-	if (is_at_end()) return '\0';
+fn char LoxScanner.peek(LoxScanner* scanner) {
+	if (scanner.is_at_end()) return '\0';
 	return scanner.source[scanner.current];
 }
 
-fn char peek_next() {
-	if (is_at_end(1)) return '\0';
+fn char LoxScanner.peek_next(LoxScanner* scanner) {
+	if (scanner.is_at_end(1)) return '\0';
 	return scanner.source[scanner.current + 1];
 }
 
-fn bool match(char expected) {
-	if (is_at_end()) return false;
+fn bool LoxScanner.match(LoxScanner* scanner, char expected) {
+	if (scanner.is_at_end()) return false;
 	if (scanner.source[scanner.current] != expected) return false;
 	scanner.current++;
 	return true;
 }
 
-fn void skip_whitespace() {
+fn void LoxScanner.skip_whitespace(LoxScanner* scanner) {
 	for (;;) {
-		char c = peek();
+		char c = scanner.peek();
+
 		switch (c) {
 			case ' ':
 			case '\r':
 			case '\t':
-				advance();
+				scanner.advance();
+
 			case '\n':
 				scanner.line++;
-				advance();
+				scanner.advance();
+
 			case '/':
-				if (peek_next() == '/') {
-					while (peek() != '\n' && !is_at_end()) advance();
+				if (scanner.peek_next() == '/') {
+					while (scanner.peek() != '\n' && !scanner.is_at_end()) {
+						scanner.advance();
+					}
 				} else {
 					return;
 				}
-			default:
-				return;
+
+			default: return;
 		}
 	}
 }
 
-fn TokenType check_keyword(sz start, sz length, String rest, TokenType type) {
+fn TokenType LoxScanner.check_keyword(
+	LoxScanner* scanner,
+	sz start,
+	sz length,
+	String rest,
+	TokenType type
+) {
 	if (scanner.current - scanner.start == start + length
 		&& scanner.source[scanner.start + start:length] == rest) {
 		return type;
@@ -126,98 +138,108 @@ fn TokenType check_keyword(sz start, sz length, String rest, TokenType type) {
 	return IDENTIFIER;
 }
 
-fn TokenType identifier_type() {
+fn TokenType LoxScanner.identifier_type(LoxScanner* scanner) {
 	switch (scanner.source[scanner.start]) {
-		case 'a': return check_keyword(1, 2, "nd", AND);
-		case 'c': return check_keyword(1, 4, "lass", CLASS);
-		case 'e': return check_keyword(1, 3, "lse", ELSE);
+		case 'a': return scanner.check_keyword(1, 2, "nd", AND);
+		case 'c': return scanner.check_keyword(1, 4, "lass", CLASS);
+		case 'e': return scanner.check_keyword(1, 3, "lse", ELSE);
+
 		case 'f':
 			if (scanner.current - scanner.start > 1) {
 				switch (scanner.source[scanner.start + 1]) {
-					case 'a': return check_keyword(2, 3, "lse", FALSE);
-					case 'o': return check_keyword(2, 1, "r", FOR);
-					case 'u': return check_keyword(2, 1, "n", FUN);
+					case 'a': return scanner.check_keyword(2, 3, "lse", FALSE);
+					case 'o': return scanner.check_keyword(2, 1, "r", FOR);
+					case 'u': return scanner.check_keyword(2, 1, "n", FUN);
 				}
 			}
-		case 'i': return check_keyword(1, 1, "f", IF);
-		case 'n': return check_keyword(1, 2, "il", NIL);
-		case 'o': return check_keyword(1, 1, "r", OR);
-		case 'p': return check_keyword(1, 4, "rint", PRINT);
-		case 'r': return check_keyword(1, 5, "eturn", RETURN);
-		case 's': return check_keyword(1, 4, "uper", SUPER);
+
+		case 'i': return scanner.check_keyword(1, 1, "f", IF);
+		case 'n': return scanner.check_keyword(1, 2, "il", NIL);
+		case 'o': return scanner.check_keyword(1, 1, "r", OR);
+		case 'p': return scanner.check_keyword(1, 4, "rint", PRINT);
+		case 'r': return scanner.check_keyword(1, 5, "eturn", RETURN);
+		case 's': return scanner.check_keyword(1, 4, "uper", SUPER);
+
 		case 't':
 			if (scanner.current - scanner.start > 1) {
 				switch (scanner.source[scanner.start + 1]) {
-					case 'h': return check_keyword(2, 2, "is", THIS);
-					case 'r': return check_keyword(2, 2, "ue", TRUE);
+					case 'h': return scanner.check_keyword(2, 2, "is", THIS);
+					case 'r': return scanner.check_keyword(2, 2, "ue", TRUE);
 				}
 			}
-		case 'v': return check_keyword(1, 2, "ar", VAR);
-		case 'w': return check_keyword(1, 4, "hile", WHILE);
+
+		case 'v': return scanner.check_keyword(1, 2, "ar", VAR);
+		case 'w': return scanner.check_keyword(1, 4, "hile", WHILE);
 	}
 
 	return IDENTIFIER;
 }
 
-fn Token identifier() {
-	while (is_alpha(peek()) || is_digit(peek())) advance();
-	return make_token(identifier_type());
-}
-
-fn Token number() {
-	while (is_digit(peek())) advance();
-
-	if (peek() == '.' && is_digit(peek_next())) {
-		advance();
-		while (is_digit(peek())) advance();
+fn LoxToken LoxScanner.identifier(LoxScanner* scanner) {
+	while (is_alpha(scanner.peek()) || is_digit(scanner.peek())) {
+		scanner.advance();
 	}
 
-	return make_token(NUMBER);
+	return scanner.make_token(scanner.identifier_type());
 }
 
-fn Token string() {
+fn LoxToken LoxScanner.number(LoxScanner* scanner) {
+	while (is_digit(scanner.peek())) {
+		scanner.advance();
+	}
+
+	if (scanner.peek() == '.' && is_digit(scanner.peek_next())) {
+		scanner.advance();
+		while (is_digit(scanner.peek())) scanner.advance();
+	}
+
+	return scanner.make_token(NUMBER);
+}
+
+fn LoxToken LoxScanner.string(LoxScanner* scanner) {
 	for (;;) {
-		char val = peek();
+		char val = scanner.peek();
 		if (val == '"' || val == '\0') break;
 		if (val == '\n') scanner.line++;
-		advance();
+		scanner.advance();
 	}
 
-	if (is_at_end()) return error_token("Unterminated string.");
-	advance();
-	return make_token(STRING);
+	if (scanner.is_at_end()) {
+		return scanner.error_token("Unterminated string.");
+	}
+
+	scanner.advance();
+	return scanner.make_token(STRING);
 }
 
-fn Token scan_token() {
-	skip_whitespace();
+fn LoxToken LoxScanner.scan_token(LoxScanner* scanner) {
+	scanner.skip_whitespace();
 	scanner.start = scanner.current;
 
-	if (is_at_end()) {
-		return make_token(EOF);
-	}
+	if (scanner.is_at_end()) return scanner.make_token(EOF);
+	char c = scanner.advance();
 
-	char c = advance();
-	if (is_alpha(c)) return identifier();
-	if (is_digit(c)) return number();
+	if (is_alpha(c)) return scanner.identifier();
+	if (is_digit(c)) return scanner.number();
 
 	switch (c) {
-		case '(': return make_token(LEFT_PAREN);
-		case ')': return make_token(RIGHT_PAREN);
-		case '{': return make_token(LEFT_BRACE);
-		case '}': return make_token(RIGHT_BRACE);
-		case ';': return make_token(SEMICOLON);
-		case ',': return make_token(COMMA);
-		case '.': return make_token(DOT);
-		case '-': return make_token(MINUS);
-		case '+': return make_token(PLUS);
-		case '/': return make_token(SLASH);
-		case '*': return make_token(STAR);
-		case '!': return make_token(match('=') ? BANG_EQUAL : BANG);
-		case '=': return make_token(match('=') ? EQUAL_EQUAL : EQUAL);
-		case '<': return make_token(match('=') ? LESS_EQUAL : LESS);
-		case '>': return make_token(match('=') ? GREATER_EQUAL : GREATER);
-		case '"': return string();
+		case '(': return scanner.make_token(LEFT_PAREN);
+		case ')': return scanner.make_token(RIGHT_PAREN);
+		case '{': return scanner.make_token(LEFT_BRACE);
+		case '}': return scanner.make_token(RIGHT_BRACE);
+		case ';': return scanner.make_token(SEMICOLON);
+		case ',': return scanner.make_token(COMMA);
+		case '.': return scanner.make_token(DOT);
+		case '-': return scanner.make_token(MINUS);
+		case '+': return scanner.make_token(PLUS);
+		case '/': return scanner.make_token(SLASH);
+		case '*': return scanner.make_token(STAR);
+		case '!': return scanner.make_token(scanner.match('=') ? BANG_EQUAL : BANG);
+		case '=': return scanner.make_token(scanner.match('=') ? EQUAL_EQUAL : EQUAL);
+		case '<': return scanner.make_token(scanner.match('=') ? LESS_EQUAL : LESS);
+		case '>': return scanner.make_token(scanner.match('=') ? GREATER_EQUAL : GREATER);
+		case '"': return scanner.string();
 	}
 
-	return error_token("Unexpected character.");
+	return scanner.error_token("Unexpected character.");
 }

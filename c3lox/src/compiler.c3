@@ -1,13 +1,10 @@
 module c3lox;
 
-import scanner;
 import std::io;
 
-const UINT8_MAX = 255;
-
 struct Parser {
-	Token current;
-	Token previous;
+	LoxToken current;
+	LoxToken previous;
 	bool had_error;
 	bool panic_mode;
 }
@@ -32,44 +29,59 @@ struct ParseRule {
 	Precedence precedence;
 }
 
+struct Local {
+	LoxToken name;
+	sz depth;
+}
+
+struct Compiler {
+	Local[UINT8_COUNT] locals;
+	sz local_count;
+	sz scope_depth;
+
+	LoxScanner scanner;
+	Parser parser;
+	Chunk* chunk;
+}
+
 // c3fmt off
 const ParseRule*[*] RULE = {
-	[TokenType.LEFT_PAREN]    = &&{ &grouping, null,    Precedence.NONE },
+	[TokenType.LEFT_PAREN]    = &&{ &Compiler.grouping, null,    Precedence.NONE },
 	[TokenType.RIGHT_PAREN]   = &&{ null,      null,    Precedence.NONE },
 	[TokenType.LEFT_BRACE]    = &&{ null,      null,    Precedence.NONE },
 	[TokenType.RIGHT_BRACE]   = &&{ null,      null,    Precedence.NONE },
 	[TokenType.COMMA]         = &&{ null,      null,    Precedence.NONE },
 	[TokenType.DOT]           = &&{ null,      null,    Precedence.NONE },
-	[TokenType.MINUS]         = &&{ &unary,    &binary, Precedence.TERM },
-	[TokenType.PLUS]          = &&{ null,      &binary, Precedence.TERM },
+	[TokenType.MINUS]         = &&{ &Compiler.unary,    &Compiler.binary, Precedence.TERM },
+	[TokenType.PLUS]          = &&{ null,      &Compiler.binary, Precedence.TERM },
 	[TokenType.SEMICOLON]     = &&{ null,      null,    Precedence.NONE },
-	[TokenType.SLASH]         = &&{ null,      &binary, Precedence.FACTOR },
-	[TokenType.STAR]          = &&{ null,      &binary, Precedence.FACTOR },
-	[TokenType.BANG]          = &&{ &unary,    null,    Precedence.NONE },
-	[TokenType.BANG_EQUAL]    = &&{ null,      &binary, Precedence.EQUALITY },
+	[TokenType.SLASH]         = &&{ null,      &Compiler.binary, Precedence.FACTOR },
+	[TokenType.STAR]          = &&{ null,      &Compiler.binary, Precedence.FACTOR },
+	[TokenType.BANG]          = &&{ &Compiler.unary,    null,    Precedence.NONE },
+	[TokenType.BANG_EQUAL]    = &&{ null,      &Compiler.binary, Precedence.EQUALITY },
 	[TokenType.EQUAL]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.EQUAL_EQUAL]   = &&{ null,      &binary, Precedence.EQUALITY },
-	[TokenType.GREATER]       = &&{ null,      &binary, Precedence.COMPARISON },
-	[TokenType.GREATER_EQUAL] = &&{ null,      &binary, Precedence.COMPARISON },
-	[TokenType.LESS]          = &&{ null,      &binary, Precedence.COMPARISON },
-	[TokenType.LESS_EQUAL]    = &&{ null,      &binary, Precedence.COMPARISON },
-	[TokenType.IDENTIFIER]    = &&{ &variable, null,    Precedence.NONE },
-	[TokenType.STRING]        = &&{ &string,   null,    Precedence.NONE },
-	[TokenType.NUMBER]        = &&{ &number,   null,    Precedence.NONE },
+	[TokenType.EQUAL_EQUAL]   = &&{ null,      &Compiler.binary, Precedence.EQUALITY },
+	[TokenType.GREATER]       = &&{ null,      &Compiler.binary, Precedence.COMPARISON },
+	[TokenType.GREATER_EQUAL] = &&{ null,      &Compiler.binary, Precedence.COMPARISON },
+	[TokenType.LESS]          = &&{ null,      &Compiler.binary, Precedence.COMPARISON },
+	[TokenType.LESS_EQUAL]    = &&{ null,      &Compiler.binary, Precedence.COMPARISON },
+	[TokenType.IDENTIFIER]    = &&{ &Compiler.variable, null,    Precedence.NONE },
+	[TokenType.STRING]        = &&{ &Compiler.string,   null,    Precedence.NONE },
+	[TokenType.NUMBER]        = &&{ &Compiler.number,   null,    Precedence.NONE },
 	[TokenType.AND]           = &&{ null,      null,    Precedence.NONE },
 	[TokenType.CLASS]         = &&{ null,      null,    Precedence.NONE },
 	[TokenType.ELSE]          = &&{ null,      null,    Precedence.NONE },
-	[TokenType.FALSE]         = &&{ &literal,  null,    Precedence.NONE },
+	[TokenType.FALSE]         = &&{ &Compiler.literal,  null,    Precedence.NONE },
 	[TokenType.FOR]           = &&{ null,      null,    Precedence.NONE },
 	[TokenType.FUN]           = &&{ null,      null,    Precedence.NONE },
 	[TokenType.IF]            = &&{ null,      null,    Precedence.NONE },
-	[TokenType.NIL]           = &&{ &literal,  null,    Precedence.NONE },
+	[TokenType.NIL]           = &&{ &Compiler.literal,  null,    Precedence.NONE },
 	[TokenType.OR]            = &&{ null,      null,    Precedence.NONE },
 	[TokenType.PRINT]         = &&{ null,      null,    Precedence.NONE },
 	[TokenType.RETURN]        = &&{ null,      null,    Precedence.NONE },
 	[TokenType.SUPER]         = &&{ null,      null,    Precedence.NONE },
 	[TokenType.THIS]          = &&{ null,      null,    Precedence.NONE },
-	[TokenType.TRUE]          = &&{ &literal,  null,    Precedence.NONE },
+	[TokenType.TRUE]          = &&{ &Compiler.literal,  null,    Precedence.NONE },
 	[TokenType.VAR]           = &&{ null,      null,    Precedence.NONE },
 	[TokenType.WHILE]         = &&{ null,      null,    Precedence.NONE },
 	[TokenType.ERROR]         = &&{ null,      null,    Precedence.NONE },
@@ -77,12 +89,9 @@ const ParseRule*[*] RULE = {
 };
 // c3fmt on
 
-Parser parser;
-Chunk* chunk @local = null;
-
-fn void error_at(Token* token, String message) {
-	if (parser.panic_mode) return;
-	parser.panic_mode = true;
+fn void Compiler.error_at(Compiler* compiler, LoxToken* token, String message) {
+	if (compiler.parser.panic_mode) return;
+	compiler.parser.panic_mode = true;
 	io::eprintf("[line %d] Error", token.line);
 
 	if (token.type == EOF) {
@@ -94,194 +103,224 @@ fn void error_at(Token* token, String message) {
 	}
 
 	io::eprintfn(": %s", message);
-	parser.had_error = true;
+	compiler.parser.had_error = true;
 }
 
-fn void error(String message) => error_at(&parser.previous, message);
-fn void error_at_current(String message) => error_at(&parser.current, message);
+fn void Compiler.error(Compiler* compiler, String message) {
+	compiler.error_at(&compiler.parser.previous, message);
+}
 
-fn void advance() {
-	parser.previous = parser.current;
+fn void Compiler.error_at_current(Compiler* compiler, String message) {
+	compiler.error_at(&compiler.parser.current, message);
+}
+
+fn void Compiler.advance(Compiler* compiler) {
+	compiler.parser.previous = compiler.parser.current;
 
 	for (;;) {
-		parser.current = scanner::scan_token();
-		if (parser.current.type != ERROR) break;
-
-		error_at_current(parser.current.lexeme);
+		compiler.parser.current = compiler.scanner.scan_token();
+		if (compiler.parser.current.type != ERROR) break;
+		compiler.error_at_current(compiler.parser.current.lexeme);
 	}
 }
 
-fn void consume(TokenType type, String message) {
-	if (parser.current.type == type) {
-		advance();
+fn void Compiler.consume(Compiler* compiler, TokenType type, String message) {
+	if (compiler.parser.current.type == type) {
+		compiler.advance();
 		return;
 	}
 
-	error_at_current(message);
+	compiler.error_at_current(message);
 }
 
-fn bool check(TokenType type) => parser.current.type == type;
+fn bool Compiler.check(Compiler* compiler, TokenType type) {
+	return compiler.parser.current.type == type;
+}
 
-fn bool match(TokenType type) {
-	if (!check(type)) return false;
-	advance();
+fn bool Compiler.match(Compiler* compiler, TokenType type) {
+	if (!compiler.check(type)) return false;
+	compiler.advance();
 	return true;
 }
 
-fn void emit_byte(Uint8 byte) => chunk.write(byte, parser.previous.line);
-fn void emit_return() => emit_byte(Op.RETURN);
-fn ParseRule* get_rule(TokenType type) => RULE[type];
-
-fn void emit_bytes(Uint8 byte1, Uint8 byte2) {
-	emit_byte(byte1);
-	emit_byte(byte2);
+fn void Compiler.emit_byte(Compiler* compiler, Uint8 byte) {
+	compiler.chunk.write(byte, compiler.parser.previous.line);
 }
 
-fn void end_compiler() {
-	emit_return();
+fn void Compiler.emit_return(Compiler* compiler) => compiler.emit_byte(Op.RETURN);
+
+fn ParseRule* Compiler.get_rule(Compiler* compiler, TokenType type) => RULE[type];
+
+fn void Compiler.emit_bytes(Compiler* compiler, Uint8 byte1, Uint8 byte2) {
+	compiler.emit_byte(byte1);
+	compiler.emit_byte(byte2);
+}
+
+fn void Compiler.end(Compiler* compiler) {
+	compiler.emit_return();
 	$if $feat(DEBUG_PRINT_CODE):
-		if (!parser.had_error) chunk.disassemble_chunk("code");
+		if (!compiler.parser.had_error) compiler.chunk.disassemble_chunk("code");
 	$endif
 }
 
-fn void number(bool can_assign) {
-	double val = parser.previous.lexeme.to_double()!!;
-	emit_constant(number_val(val));
+fn void Compiler.begin_scope(Compiler* compiler) {
+	compiler.scope_depth++;
 }
 
-fn void string(bool can_assign) {
-	sz len       = parser.previous.lexeme.len;
-	String inner = parser.previous.lexeme[1..^2];
+fn void Compiler.end_scope(Compiler* compiler) {
+	compiler.scope_depth--;
+}
+
+fn void Compiler.number(Compiler* compiler, bool can_assign) {
+	double val = compiler.parser.previous.lexeme.to_double()!!;
+	compiler.emit_constant(number_val(val));
+}
+
+fn void Compiler.string(Compiler* compiler, bool can_assign) {
+	sz len       = compiler.parser.previous.lexeme.len;
+	String inner = compiler.parser.previous.lexeme[1..^2];
 	Obj* c       = allocate_string(inner);
-	emit_constant(obj_val(c));
+	compiler.emit_constant(obj_val(c));
 }
 
-fn void named_variable(Token name, bool can_assign) {
-	Uint8 arg = identifier_constant(&name);
-	if (can_assign && match(EQUAL)) {
-		expression();
-		emit_bytes(Op.SET_GLOBAL, arg);
+fn void Compiler.named_variable(Compiler* compiler, LoxToken name, bool can_assign) {
+	Uint8 arg = compiler.identifier_constant(&name);
+	if (can_assign && compiler.match(EQUAL)) {
+		compiler.expression();
+		compiler.emit_bytes(Op.SET_GLOBAL, arg);
 	} else {
-		emit_bytes(Op.GET_GLOBAL, arg);
+		compiler.emit_bytes(Op.GET_GLOBAL, arg);
 	}
 }
 
-fn void variable(bool can_assign) => named_variable(parser.previous, can_assign);
+fn void Compiler.variable(Compiler* compiler, bool can_assign) {
+	compiler.named_variable(compiler.parser.previous, can_assign);
+}
 
-fn void parse_precedence(Precedence precedence) {
-	advance();
-	ParseFn prefix_rule = get_rule(parser.previous.type).prefix;
+fn void Compiler.parse_precedence(Compiler* compiler, Precedence precedence) {
+	compiler.advance();
+	ParseFn prefix_rule = compiler.get_rule(compiler.parser.previous.type).prefix;
 	if (prefix_rule == null) {
-		error("Expect expression.");
+		compiler.error("Expect expression.");
 		return;
 	}
 
 	bool can_assign = precedence <= ASSIGNMENT;
-	prefix_rule(can_assign);
+	prefix_rule(compiler, can_assign);
 
-	while (precedence <= get_rule(parser.current.type).precedence) {
-		advance();
-		ParseFn infix_rule = get_rule(parser.previous.type).infix;
-		infix_rule(can_assign);
+	while (precedence <= compiler.get_rule(compiler.parser.current.type).precedence) {
+		compiler.advance();
+		ParseFn infix_rule = compiler.get_rule(compiler.parser.previous.type).infix;
+		infix_rule(compiler, can_assign);
 	}
 
-	if (can_assign && match(EQUAL)) {
-		error("Invalid assignment target.");
+	if (can_assign && compiler.match(EQUAL)) {
+		compiler.error("Invalid assignment target.");
 	}
 }
 
-fn Uint8 identifier_constant(Token* name) {
+fn Uint8 Compiler.identifier_constant(Compiler* compiler, LoxToken* name) {
 	Uint8? val = vm.chunk.idents.get(name.lexeme);
 	if (try val) return val;
-	
-	Uint8 idx = make_constant(obj_val(allocate_ident(name.lexeme)));
+
+	Uint8 idx = compiler.make_constant(obj_val(allocate_ident(name.lexeme)));
 	vm.chunk.idents.set(name.lexeme, idx);
 	return idx;
 }
 
-fn Uint8 parse_variable(String error_message) {
-	consume(IDENTIFIER, error_message);
-	return identifier_constant(&parser.previous);
+fn Uint8 Compiler.parse_variable(Compiler* compiler, String error_message) {
+	compiler.consume(IDENTIFIER, error_message);
+	return compiler.identifier_constant(&compiler.parser.previous);
 }
 
-fn void define_variable(Uint8 global) {
-	emit_bytes(Op.DEFINE_GLOBAL, global);
+fn void Compiler.define_variable(Compiler* compiler, Uint8 global) {
+	compiler.emit_bytes(Op.DEFINE_GLOBAL, global);
 }
 
-fn void unary(bool can_assign) {
-	TokenType operator_type = parser.previous.type;
-	parse_precedence(UNARY);
+fn void Compiler.unary(Compiler* compiler, bool can_assign) {
+	TokenType operator_type = compiler.parser.previous.type;
+	compiler.parse_precedence(UNARY);
 
 	switch (operator_type) {
-		case BANG: emit_byte(Op.NOT);
-		case MINUS: emit_byte(Op.NEGATE);
+		case BANG: compiler.emit_byte(Op.NOT);
+		case MINUS: compiler.emit_byte(Op.NEGATE);
 		default: return;
 	}
 }
 
-fn void binary(bool can_assign) {
-	TokenType operator_type = parser.previous.type;
-	ParseRule* rule         = get_rule(operator_type);
-	parse_precedence((Precedence)(rule.precedence.ordinal + 1));
+fn void Compiler.binary(Compiler* compiler, bool can_assign) {
+	TokenType operator_type = compiler.parser.previous.type;
+	ParseRule* rule         = compiler.get_rule(operator_type);
+	compiler.parse_precedence((Precedence)(rule.precedence.ordinal + 1));
 
 	// c3fmt off
 	switch (operator_type) {
-		case BANG_EQUAL:    emit_bytes(Op.EQUAL, Op.NOT);
-		case EQUAL_EQUAL:   emit_byte(Op.EQUAL);
-		case GREATER:       emit_byte(Op.GREATER);
-		case GREATER_EQUAL: emit_bytes(Op.LESS, Op.NOT);
-		case LESS:          emit_byte(Op.LESS);
-		case LESS_EQUAL:    emit_bytes(Op.GREATER, Op.NOT);
-		case PLUS:          emit_byte(Op.ADD);
-		case MINUS:         emit_byte(Op.SUBTRACT);
-		case STAR:          emit_byte(Op.MULTIPLY);
-		case SLASH:         emit_byte(Op.DIVIDE);
+		case BANG_EQUAL:    compiler.emit_bytes(Op.EQUAL, Op.NOT);
+		case EQUAL_EQUAL:   compiler.emit_byte(Op.EQUAL);
+		case GREATER:       compiler.emit_byte(Op.GREATER);
+		case GREATER_EQUAL: compiler.emit_bytes(Op.LESS, Op.NOT);
+		case LESS:          compiler.emit_byte(Op.LESS);
+		case LESS_EQUAL:    compiler.emit_bytes(Op.GREATER, Op.NOT);
+		case PLUS:          compiler.emit_byte(Op.ADD);
+		case MINUS:         compiler.emit_byte(Op.SUBTRACT);
+		case STAR:          compiler.emit_byte(Op.MULTIPLY);
+		case SLASH:         compiler.emit_byte(Op.DIVIDE);
 		default:            return;
 	}
 	// c3fmt on
 }
 
-fn void literal(bool can_assign) {
-	switch (parser.previous.type) {
-		case FALSE: emit_byte(Op.FALSE); break;
-		case NIL: emit_byte(Op.NIL); break;
-		case TRUE: emit_byte(Op.TRUE); break;
+fn void Compiler.literal(Compiler* compiler, bool can_assign) {
+	switch (compiler.parser.previous.type) {
+		case FALSE: compiler.emit_byte(Op.FALSE); break;
+		case NIL: compiler.emit_byte(Op.NIL); break;
+		case TRUE: compiler.emit_byte(Op.TRUE); break;
 		default: return;  // Unreachable.
 	}
 }
 
-fn void expression() => parse_precedence(ASSIGNMENT);
-
-fn void expression_statement() {
-	expression();
-	consume(SEMICOLON, "Expect ';' after expression.");
-	emit_byte(Op.POP);
+fn void Compiler.expression(Compiler* compiler) {
+	compiler.parse_precedence(ASSIGNMENT);
 }
 
-fn void var_declaration() {
-	Uint8 global = parse_variable("Expect variable name.");
-
-	if (match(EQUAL)) {
-		expression();
-	} else {
-		emit_byte(Op.NIL);
+fn void Compiler.block(Compiler* compiler) {
+	while (!compiler.check(RIGHT_BRACE) && !compiler.check(EOF)) {
+		compiler.declaration();
 	}
-	consume(SEMICOLON, "Expect ';' after variable declaration.");
-	define_variable(global);
+
+	compiler.consume(RIGHT_BRACE, "Expect '} after block");
 }
 
-fn void print_statement() {
-	expression();
-	consume(SEMICOLON, "Expect ';' after value.");
-	emit_byte(Op.PRINT);
+fn void Compiler.expression_statement(Compiler* compiler) {
+	compiler.expression();
+	compiler.consume(SEMICOLON, "Expect ';' after expression.");
+	compiler.emit_byte(Op.POP);
 }
 
-fn void synchronize() {
-	parser.panic_mode = false;
+fn void Compiler.var_declaration(Compiler* compiler) {
+	Uint8 global = compiler.parse_variable("Expect variable name.");
 
-	while (parser.current.type != EOF) {
-		if (parser.previous.type == SEMICOLON) return;
-		switch (parser.current.type) {
+	if (compiler.match(EQUAL)) {
+		compiler.expression();
+	} else {
+		compiler.emit_byte(Op.NIL);
+	}
+	compiler.consume(SEMICOLON, "Expect ';' after variable declaration.");
+	compiler.define_variable(global);
+}
+
+fn void Compiler.print_statement(Compiler* compiler) {
+	compiler.expression();
+	compiler.consume(SEMICOLON, "Expect ';' after value.");
+	compiler.emit_byte(Op.PRINT);
+}
+
+fn void Compiler.synchronize(Compiler* compiler) {
+	compiler.parser.panic_mode = false;
+
+	while (compiler.parser.current.type != EOF) {
+		if (compiler.parser.previous.type == SEMICOLON) return;
+		switch (compiler.parser.current.type) {
 			case CLASS:
 			case FUN:
 			case VAR:
@@ -293,54 +332,67 @@ fn void synchronize() {
 			default:
 		}
 
-		advance();
+		compiler.advance();
 	}
 }
-fn void declaration() {
-	if (match(VAR)) {
-		var_declaration();
+fn void Compiler.declaration(Compiler* compiler) {
+	if (compiler.match(VAR)) {
+		compiler.var_declaration();
 	} else {
-		statement();
+		compiler.statement();
 	}
-	if (parser.panic_mode) synchronize();
+	if (compiler.parser.panic_mode) compiler.synchronize();
 }
 
-fn void statement() {
-	if (match(PRINT)) {
-		print_statement();
+fn void Compiler.statement(Compiler* compiler) {
+	if (compiler.match(PRINT)) {
+		compiler.print_statement();
+	} else if (compiler.match(LEFT_BRACE)) {
+		compiler.begin_scope();
+		compiler.block();
+		compiler.end_scope();
 	} else {
-		expression_statement();
+		compiler.expression_statement();
 	}
 }
 
-fn void grouping(bool can_assign) {
-	expression();
-	consume(RIGHT_PAREN, "Expect ')' after compiler_expression.");
+fn void Compiler.grouping(Compiler* compiler, bool can_assign) {
+	compiler.expression();
+	compiler.consume(RIGHT_PAREN, "Expect ')' after compiler_expression.");
 }
 
-fn Uint8 make_constant(Value value) {
-	sz constant = chunk.add_constant(value);
+fn Uint8 Compiler.make_constant(Compiler* compiler, Value value) {
+	sz constant = compiler.chunk.add_constant(value);
 	if (constant > UINT8_MAX) {
-		error("Too many constants in one chunk.");
+		compiler.error("Too many constants in one chunk.");
 		return 0;
 	}
 
 	return (Uint8)constant;
 }
 
-fn void emit_constant(Value value) => emit_bytes(Op.CONSTANT, make_constant(value));
+fn void Compiler.emit_constant(Compiler* compiler, Value value) {
+	compiler.emit_bytes(Op.CONSTANT, compiler.make_constant(value));
+}
 
 fn bool compile(char[] source, Chunk* new_chunk) {
-	scanner::init(source);
-	chunk = new_chunk;
+	Compiler compiler;
+	compiler.init(source);
+	compiler.chunk = new_chunk;
 
-	parser.had_error = false;
-	parser.panic_mode = false;
+	compiler.parser.had_error = false;
+	compiler.parser.panic_mode = false;
 
-	advance();
-	while (!match(EOF)) {
-		declaration();
+	compiler.advance();
+	while (!compiler.match(EOF)) {
+		compiler.declaration();
 	}
-	end_compiler();
-	return !parser.had_error;
+	compiler.end();
+	return !compiler.parser.had_error;
+}
+
+fn void Compiler.init(Compiler* compiler, char[] source) {
+	compiler.scanner.init(source);
+	compiler.local_count = 0;
+	compiler.scope_depth = 0;
 }

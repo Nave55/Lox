@@ -12,9 +12,10 @@ fn void run_file(String path) => @pool() {
 
 	vm_init();
 	interpret(con) ?? os::exit(65);
+	free_objects();
 }
 
-fn void repl() {
+fn void repl() => @pool() {
 	vm_init();
 
 	io::printn("-----------------------------------------");
@@ -28,7 +29,10 @@ fn void repl() {
 				io::print("\x1b[H\x1b[2J");
 				continue;
 			}
-			if (line == ":q" || line == "exit") return;
+			if (line == ":q" || line == "exit") {
+				free_objects();
+				return;
+			}
 			@catch(interpret(line));
 		};
 	}

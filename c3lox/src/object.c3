@@ -29,8 +29,9 @@ macro as_string(v) => as_obj(v).data.as_string;
 macro is_ident(v) => is_obj(v) && obj_type(v) == IDENT;
 macro as_ident(v) => as_obj(v).data.as_ident;
 
+// allocation
 fn Obj* allocate_obj(ObjType type) {
-	Obj* obj = tmalloc(Obj::size);
+	Obj* obj = malloc(Obj::size);
 	obj.tag = type;
 
 	vm.objects.push(obj);
@@ -39,7 +40,7 @@ fn Obj* allocate_obj(ObjType type) {
 
 fn Obj* allocate_string(String str) {
 	Obj* obj = allocate_obj(STRING);
-	obj.data.as_string = dstring::new(tmem, str);
+	obj.data.as_string = dstring::new(mem, str);
 
 	return obj;
 }

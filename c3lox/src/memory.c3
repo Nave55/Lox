@@ -12,6 +12,7 @@ fn void free_object(Obj* object) {
 	switch (object.tag) {
 		case STRING: object.data.as_string.free();
 	}
+	free(object);
 }
 
 macro mem_free(type, pointer) => realloc(pointer, @sizeof(type));
