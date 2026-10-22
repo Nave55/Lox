@@ -9,6 +9,8 @@ constset Op : inline Uint8 {
 	TRUE,
 	FALSE,
 	POP,
+	GET_LOCAL,
+	SET_LOCAL,
 	GET_GLOBAL,
 	SET_GLOBAL,
 	DEFINE_GLOBAL,
@@ -29,7 +31,7 @@ struct Chunk {
 	List{Uint8} code;
 	List{sz} lines;
 	ValueArray constants;
-	HashMap{String, Uint8} idents;
+	HashMap{String, Uint8} globals;
 }
 
 // ** allocations **
@@ -37,7 +39,7 @@ fn void Chunk.init(Chunk* chunk) {
 	chunk.code.tinit(32);
 	chunk.lines.tinit(16);
 	chunk.constants.tinit(32);
-	chunk.idents.tinit(16);
+	chunk.globals.tinit(16);
 }
 
 fn void Chunk.write(Chunk* chunk, Uint8 byte, sz line) {

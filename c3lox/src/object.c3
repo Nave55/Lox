@@ -30,7 +30,7 @@ macro is_ident(v) => is_obj(v) && obj_type(v) == IDENT;
 macro as_ident(v) => as_obj(v).data.as_ident;
 
 // allocation
-fn Obj* allocate_obj(ObjType type) {
+fn Obj* Vm.allocate_obj(Vm* vm, ObjType type) {
 	Obj* obj = malloc(Obj::size);
 	obj.tag = type;
 
@@ -38,15 +38,15 @@ fn Obj* allocate_obj(ObjType type) {
 	return obj;
 }
 
-fn Obj* allocate_string(String str) {
-	Obj* obj = allocate_obj(STRING);
+fn Obj* Vm.allocate_string(Vm* vm, String str) {
+	Obj* obj = vm.allocate_obj(STRING);
 	obj.data.as_string = dstring::new(mem, str);
 
 	return obj;
 }
 
-fn Obj* allocate_ident(String str) {
-	Obj* obj = allocate_obj(IDENT);
+fn Obj* Vm.allocate_ident(Vm* vm, String str) {
+	Obj* obj = vm.allocate_obj(IDENT);
 	obj.data.as_ident = str;
 
 	return obj;

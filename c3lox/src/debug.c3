@@ -26,9 +26,11 @@ fn sz Chunk.disassemble_instruction(Chunk* chunk, sz offset) {
 		case Op.TRUE:          return simple_instruction("TRUE", offset);
 		case Op.FALSE:         return simple_instruction("FALSE", offset);
 		case Op.POP:           return simple_instruction("POP", offset);
+		case Op.GET_LOCAL:     return byte_instruction("GET_LOCAL", chunk, offset);
+		case Op.SET_LOCAL:     return byte_instruction("SET_LOCAL", chunk, offset);
 		case Op.GET_GLOBAL:    return constant_instruction("GET_GLOBAL", chunk, offset);
 		case Op.DEFINE_GLOBAL: return constant_instruction("DEFINE_GLOBAL", chunk, offset);
-        case Op.SET_GLOBAL:    return constant_instruction("SET_GLOBAL", chunk, offset);
+    case Op.SET_GLOBAL:    return constant_instruction("SET_GLOBAL", chunk, offset);
 		case Op.EQUAL:         return simple_instruction("EQUAL", offset);
 		case Op.GREATER:       return simple_instruction("GREATER", offset);
 		case Op.LESS:          return simple_instruction("LESS", offset);
@@ -50,6 +52,12 @@ fn sz Chunk.disassemble_instruction(Chunk* chunk, sz offset) {
 fn sz simple_instruction(String name, sz offset) {
 	io::printn(name);
 	return offset + 1;
+}
+
+fn sz byte_instruction(String name, Chunk* chunk, sz offset) {
+	Uint8 slot = chunk.code[offset + 1];
+	io::printfn("%-16s %4d", name, slot);
+	return offset + 2;
 }
 
 fn sz constant_instruction(String name, Chunk* chunk, sz offset) {

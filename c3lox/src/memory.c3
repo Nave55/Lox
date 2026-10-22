@@ -1,10 +1,10 @@
 module c3lox;
 
-fn void free_vm() {
-	free_objects();
+fn void Vm.free_vm(Vm* vm) {
+	vm.free_objects();
 }
 
-fn void free_objects() {
+fn void Vm.free_objects(Vm* vm) {
 	foreach (i : vm.objects) free_object(i);
 }
 

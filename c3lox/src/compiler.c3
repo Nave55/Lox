@@ -2,13 +2,6 @@ module c3lox;
 
 import std::io;
 
-struct Parser {
-	LoxToken current;
-	LoxToken previous;
-	bool had_error;
-	bool panic_mode;
-}
-
 enum Precedence : Uint8 {
 	NONE,
 	ASSIGNMENT, // =
@@ -29,6 +22,13 @@ struct ParseRule {
 	Precedence precedence;
 }
 
+struct Parser {
+	LoxToken current;
+	LoxToken previous;
+	bool had_error;
+	bool panic_mode;
+}
+
 struct Local {
 	LoxToken name;
 	sz depth;
@@ -36,7 +36,7 @@ struct Local {
 
 struct Compiler {
 	Local[UINT8_COUNT] locals;
-	sz local_count;
+	sz locals_count;
 	sz scope_depth;
 
 	LoxScanner scanner;
@@ -44,50 +44,11 @@ struct Compiler {
 	Chunk* chunk;
 }
 
-// c3fmt off
-const ParseRule*[*] RULE = {
-	[TokenType.LEFT_PAREN]    = &&{ &Compiler.grouping, null,    Precedence.NONE },
-	[TokenType.RIGHT_PAREN]   = &&{ null,      null,    Precedence.NONE },
-	[TokenType.LEFT_BRACE]    = &&{ null,      null,    Precedence.NONE },
-	[TokenType.RIGHT_BRACE]   = &&{ null,      null,    Precedence.NONE },
-	[TokenType.COMMA]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.DOT]           = &&{ null,      null,    Precedence.NONE },
-	[TokenType.MINUS]         = &&{ &Compiler.unary,    &Compiler.binary, Precedence.TERM },
-	[TokenType.PLUS]          = &&{ null,      &Compiler.binary, Precedence.TERM },
-	[TokenType.SEMICOLON]     = &&{ null,      null,    Precedence.NONE },
-	[TokenType.SLASH]         = &&{ null,      &Compiler.binary, Precedence.FACTOR },
-	[TokenType.STAR]          = &&{ null,      &Compiler.binary, Precedence.FACTOR },
-	[TokenType.BANG]          = &&{ &Compiler.unary,    null,    Precedence.NONE },
-	[TokenType.BANG_EQUAL]    = &&{ null,      &Compiler.binary, Precedence.EQUALITY },
-	[TokenType.EQUAL]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.EQUAL_EQUAL]   = &&{ null,      &Compiler.binary, Precedence.EQUALITY },
-	[TokenType.GREATER]       = &&{ null,      &Compiler.binary, Precedence.COMPARISON },
-	[TokenType.GREATER_EQUAL] = &&{ null,      &Compiler.binary, Precedence.COMPARISON },
-	[TokenType.LESS]          = &&{ null,      &Compiler.binary, Precedence.COMPARISON },
-	[TokenType.LESS_EQUAL]    = &&{ null,      &Compiler.binary, Precedence.COMPARISON },
-	[TokenType.IDENTIFIER]    = &&{ &Compiler.variable, null,    Precedence.NONE },
-	[TokenType.STRING]        = &&{ &Compiler.string,   null,    Precedence.NONE },
-	[TokenType.NUMBER]        = &&{ &Compiler.number,   null,    Precedence.NONE },
-	[TokenType.AND]           = &&{ null,      null,    Precedence.NONE },
-	[TokenType.CLASS]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.ELSE]          = &&{ null,      null,    Precedence.NONE },
-	[TokenType.FALSE]         = &&{ &Compiler.literal,  null,    Precedence.NONE },
-	[TokenType.FOR]           = &&{ null,      null,    Precedence.NONE },
-	[TokenType.FUN]           = &&{ null,      null,    Precedence.NONE },
-	[TokenType.IF]            = &&{ null,      null,    Precedence.NONE },
-	[TokenType.NIL]           = &&{ &Compiler.literal,  null,    Precedence.NONE },
-	[TokenType.OR]            = &&{ null,      null,    Precedence.NONE },
-	[TokenType.PRINT]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.RETURN]        = &&{ null,      null,    Precedence.NONE },
-	[TokenType.SUPER]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.THIS]          = &&{ null,      null,    Precedence.NONE },
-	[TokenType.TRUE]          = &&{ &Compiler.literal,  null,    Precedence.NONE },
-	[TokenType.VAR]           = &&{ null,      null,    Precedence.NONE },
-	[TokenType.WHILE]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.ERROR]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.EOF]           = &&{ null,      null,    Precedence.NONE },
-};
-// c3fmt on
+fn void Compiler.init(Compiler* compiler, char[] source) {
+	compiler.scanner.init(source);
+	compiler.locals_count = 0;
+	compiler.scope_depth = 0;
+}
 
 fn void Compiler.error_at(Compiler* compiler, LoxToken* token, String message) {
 	if (compiler.parser.panic_mode) return;
@@ -169,150 +130,221 @@ fn void Compiler.begin_scope(Compiler* compiler) {
 
 fn void Compiler.end_scope(Compiler* compiler) {
 	compiler.scope_depth--;
-}
-
-fn void Compiler.number(Compiler* compiler, bool can_assign) {
-	double val = compiler.parser.previous.lexeme.to_double()!!;
-	compiler.emit_constant(number_val(val));
-}
-
-fn void Compiler.string(Compiler* compiler, bool can_assign) {
-	sz len       = compiler.parser.previous.lexeme.len;
-	String inner = compiler.parser.previous.lexeme[1..^2];
-	Obj* c       = allocate_string(inner);
-	compiler.emit_constant(obj_val(c));
-}
-
-fn void Compiler.named_variable(Compiler* compiler, LoxToken name, bool can_assign) {
-	Uint8 arg = compiler.identifier_constant(&name);
-	if (can_assign && compiler.match(EQUAL)) {
-		compiler.expression();
-		compiler.emit_bytes(Op.SET_GLOBAL, arg);
-	} else {
-		compiler.emit_bytes(Op.GET_GLOBAL, arg);
+	while (compiler.locals_count > 0
+		&& compiler.locals[compiler.locals_count - 1].depth > compiler.scope_depth) {
+		compiler.emit_byte(Op.POP);
+		compiler.locals_count--;
 	}
 }
 
-fn void Compiler.variable(Compiler* compiler, bool can_assign) {
-	compiler.named_variable(compiler.parser.previous, can_assign);
+fn void number(Vm* vm, bool can_assign) {
+	double val = vm.compiler.parser.previous.lexeme.to_double()!!;
+	vm.compiler.emit_constant(number_val(val));
 }
 
-fn void Compiler.parse_precedence(Compiler* compiler, Precedence precedence) {
-	compiler.advance();
-	ParseFn prefix_rule = compiler.get_rule(compiler.parser.previous.type).prefix;
+fn void string(Vm* vm, bool can_assign) {
+	String inner = vm.compiler.parser.previous.lexeme[1..^2];
+	Obj* c       = vm.allocate_string(inner);
+	vm.compiler.emit_constant(obj_val(c));
+}
+
+fn void named_variable(Vm* vm, LoxToken name, bool can_assign) {
+	Uint8 get_op, set_op;
+	sz arg = vm.compiler.resolve_local(&name);
+	if (arg != -1) {
+		get_op = Op.GET_LOCAL;
+		set_op = Op.SET_LOCAL;
+	} else {
+		arg = identifier_constant(vm, &name);
+		get_op = Op.GET_GLOBAL;
+		set_op = Op.SET_GLOBAL;
+	}
+
+	if (can_assign && vm.compiler.match(EQUAL)) {
+		expression(vm);
+		vm.compiler.emit_bytes(set_op, (Uint8)arg);
+	} else {
+		vm.compiler.emit_bytes(get_op, (Uint8)arg);
+	}
+}
+
+fn void variable(Vm* vm, bool can_assign) {
+	named_variable(vm, vm.compiler.parser.previous, can_assign);
+}
+
+fn void parse_precedence(Vm* vm, Precedence precedence) {
+	vm.compiler.advance();
+	ParseFn prefix_rule = vm.compiler.get_rule(vm.compiler.parser.previous.type).prefix;
 	if (prefix_rule == null) {
-		compiler.error("Expect expression.");
+		vm.compiler.error("Expect expression.");
 		return;
 	}
 
 	bool can_assign = precedence <= ASSIGNMENT;
-	prefix_rule(compiler, can_assign);
+	prefix_rule(vm, can_assign);
 
-	while (precedence <= compiler.get_rule(compiler.parser.current.type).precedence) {
-		compiler.advance();
-		ParseFn infix_rule = compiler.get_rule(compiler.parser.previous.type).infix;
-		infix_rule(compiler, can_assign);
+	while (precedence <= vm.compiler.get_rule(vm.compiler.parser.current.type).precedence) {
+		vm.compiler.advance();
+		ParseFn infix_rule = vm.compiler.get_rule(vm.compiler.parser.previous.type).infix;
+		infix_rule(vm, can_assign);
 	}
 
-	if (can_assign && compiler.match(EQUAL)) {
-		compiler.error("Invalid assignment target.");
+	if (can_assign && vm.compiler.match(EQUAL)) {
+		vm.compiler.error("Invalid assignment target.");
 	}
 }
 
-fn Uint8 Compiler.identifier_constant(Compiler* compiler, LoxToken* name) {
-	Uint8? val = vm.chunk.idents.get(name.lexeme);
+fn Uint8 identifier_constant(Vm* vm, LoxToken* name) {
+	Uint8? val = vm.compiler.chunk.globals.get(name.lexeme);
 	if (try val) return val;
 
-	Uint8 idx = compiler.make_constant(obj_val(allocate_ident(name.lexeme)));
-	vm.chunk.idents.set(name.lexeme, idx);
+	Uint8 idx = vm.compiler.make_constant(obj_val(vm.allocate_ident(name.lexeme)));
+	vm.compiler.chunk.globals.set(name.lexeme, idx);
 	return idx;
 }
 
-fn Uint8 Compiler.parse_variable(Compiler* compiler, String error_message) {
-	compiler.consume(IDENTIFIER, error_message);
-	return compiler.identifier_constant(&compiler.parser.previous);
+fn bool identifiers_equal(LoxToken* a, LoxToken* b) {
+	if (a.lexeme.len != b.lexeme.len) return false;
+	return (a.lexeme == b.lexeme);
+}
+
+fn sz Compiler.resolve_local(Compiler* compiler, LoxToken* name) {
+	for (sz i = compiler.locals_count - 1; i >= 0; i--) {
+		Local* local = &compiler.locals[i];
+		if (identifiers_equal(name, &local.name)) {
+			if (local.depth == -1) {
+				compiler.error("Can't read local variable in its own initializer.");
+			}
+		}
+		return i;
+	}
+	return -1;
+}
+
+fn void Compiler.add_local(Compiler* compiler, LoxToken name) {
+	if (compiler.locals_count == UINT8_COUNT) {
+		compiler.error("Too man local variables in functions");
+		return;
+	}
+	Local* local = &compiler.locals[compiler.locals_count++];
+	local.name = name;
+	local.depth = -1;
+}
+
+fn void Compiler.declare_variable(Compiler* compiler) {
+	if (compiler.scope_depth == 0) return;
+
+	LoxToken* name = &compiler.parser.previous;
+	for (sz i = compiler.locals_count - 1; i >= 0; i--) {
+		Local* local = &compiler.locals[i];
+		if (local.depth != -1 && local.depth < compiler.scope_depth) {
+			break;
+		}
+
+		if (identifiers_equal(name, &local.name)) {
+			compiler.error("Already a variable with this name in this scope.");
+		}
+	}
+	compiler.add_local(*name);
+}
+
+fn Uint8 parse_variable(Vm* vm, String error_message) {
+	vm.compiler.consume(IDENTIFIER, error_message);
+
+	vm.compiler.declare_variable();
+	if (vm.compiler.scope_depth > 0) return 0;
+
+	return identifier_constant(vm, &vm.compiler.parser.previous);
+}
+
+fn void Compiler.mark_initialized(Compiler* compiler) {
+	compiler.locals[compiler.locals_count - 1].depth = compiler.scope_depth;
 }
 
 fn void Compiler.define_variable(Compiler* compiler, Uint8 global) {
+	if (compiler.scope_depth > 0) {
+		compiler.mark_initialized();
+		return;
+	}
 	compiler.emit_bytes(Op.DEFINE_GLOBAL, global);
 }
 
-fn void Compiler.unary(Compiler* compiler, bool can_assign) {
-	TokenType operator_type = compiler.parser.previous.type;
-	compiler.parse_precedence(UNARY);
+fn void unary(Vm* vm, bool can_assign) {
+	TokenType operator_type = vm.compiler.parser.previous.type;
+	parse_precedence(vm, UNARY);
 
 	switch (operator_type) {
-		case BANG: compiler.emit_byte(Op.NOT);
-		case MINUS: compiler.emit_byte(Op.NEGATE);
+		case BANG: vm.compiler.emit_byte(Op.NOT);
+		case MINUS: vm.compiler.emit_byte(Op.NEGATE);
 		default: return;
 	}
 }
 
-fn void Compiler.binary(Compiler* compiler, bool can_assign) {
-	TokenType operator_type = compiler.parser.previous.type;
-	ParseRule* rule         = compiler.get_rule(operator_type);
-	compiler.parse_precedence((Precedence)(rule.precedence.ordinal + 1));
+fn void binary(Vm* vm, bool can_assign) {
+	TokenType operator_type = vm.compiler.parser.previous.type;
+	ParseRule* rule         = vm.compiler.get_rule(operator_type);
+	parse_precedence(vm, (Precedence)(rule.precedence.ordinal + 1));
 
 	// c3fmt off
 	switch (operator_type) {
-		case BANG_EQUAL:    compiler.emit_bytes(Op.EQUAL, Op.NOT);
-		case EQUAL_EQUAL:   compiler.emit_byte(Op.EQUAL);
-		case GREATER:       compiler.emit_byte(Op.GREATER);
-		case GREATER_EQUAL: compiler.emit_bytes(Op.LESS, Op.NOT);
-		case LESS:          compiler.emit_byte(Op.LESS);
-		case LESS_EQUAL:    compiler.emit_bytes(Op.GREATER, Op.NOT);
-		case PLUS:          compiler.emit_byte(Op.ADD);
-		case MINUS:         compiler.emit_byte(Op.SUBTRACT);
-		case STAR:          compiler.emit_byte(Op.MULTIPLY);
-		case SLASH:         compiler.emit_byte(Op.DIVIDE);
+		case BANG_EQUAL:    vm.compiler.emit_bytes(Op.EQUAL, Op.NOT);
+		case EQUAL_EQUAL:   vm.compiler.emit_byte(Op.EQUAL);
+		case GREATER:       vm.compiler.emit_byte(Op.GREATER);
+		case GREATER_EQUAL: vm.compiler.emit_bytes(Op.LESS, Op.NOT);
+		case LESS:          vm.compiler.emit_byte(Op.LESS);
+		case LESS_EQUAL:    vm.compiler.emit_bytes(Op.GREATER, Op.NOT);
+		case PLUS:          vm.compiler.emit_byte(Op.ADD);
+		case MINUS:         vm.compiler.emit_byte(Op.SUBTRACT);
+		case STAR:          vm.compiler.emit_byte(Op.MULTIPLY);
+		case SLASH:         vm.compiler.emit_byte(Op.DIVIDE);
 		default:            return;
 	}
 	// c3fmt on
 }
 
-fn void Compiler.literal(Compiler* compiler, bool can_assign) {
-	switch (compiler.parser.previous.type) {
-		case FALSE: compiler.emit_byte(Op.FALSE); break;
-		case NIL: compiler.emit_byte(Op.NIL); break;
-		case TRUE: compiler.emit_byte(Op.TRUE); break;
+fn void literal(Vm* vm, bool can_assign) {
+	switch (vm.compiler.parser.previous.type) {
+		case FALSE: vm.compiler.emit_byte(Op.FALSE); break;
+		case NIL: vm.compiler.emit_byte(Op.NIL); break;
+		case TRUE: vm.compiler.emit_byte(Op.TRUE); break;
 		default: return;  // Unreachable.
 	}
 }
 
-fn void Compiler.expression(Compiler* compiler) {
-	compiler.parse_precedence(ASSIGNMENT);
+fn void expression(Vm* vm) {
+	parse_precedence(vm, ASSIGNMENT);
 }
 
-fn void Compiler.block(Compiler* compiler) {
-	while (!compiler.check(RIGHT_BRACE) && !compiler.check(EOF)) {
-		compiler.declaration();
+fn void block(Vm* vm) {
+	while (!vm.compiler.check(RIGHT_BRACE) && !vm.compiler.check(EOF)) {
+		declaration(vm);
 	}
 
-	compiler.consume(RIGHT_BRACE, "Expect '} after block");
+	vm.compiler.consume(RIGHT_BRACE, "Expect '} after block");
 }
 
-fn void Compiler.expression_statement(Compiler* compiler) {
-	compiler.expression();
-	compiler.consume(SEMICOLON, "Expect ';' after expression.");
-	compiler.emit_byte(Op.POP);
+fn void expression_statement(Vm* vm) {
+	expression(vm);
+	vm.compiler.consume(SEMICOLON, "Expect ';' after expression.");
+	vm.compiler.emit_byte(Op.POP);
 }
 
-fn void Compiler.var_declaration(Compiler* compiler) {
-	Uint8 global = compiler.parse_variable("Expect variable name.");
+fn void var_declaration(Vm* vm) {
+	Uint8 global = parse_variable(vm, "Expect variable name.");
 
-	if (compiler.match(EQUAL)) {
-		compiler.expression();
+	if (vm.compiler.match(EQUAL)) {
+		expression(vm);
 	} else {
-		compiler.emit_byte(Op.NIL);
+		vm.compiler.emit_byte(Op.NIL);
 	}
-	compiler.consume(SEMICOLON, "Expect ';' after variable declaration.");
-	compiler.define_variable(global);
+	vm.compiler.consume(SEMICOLON, "Expect ';' after variable declaration.");
+	vm.compiler.define_variable(global);
 }
 
-fn void Compiler.print_statement(Compiler* compiler) {
-	compiler.expression();
-	compiler.consume(SEMICOLON, "Expect ';' after value.");
-	compiler.emit_byte(Op.PRINT);
+fn void print_statement(Vm* vm) {
+	expression(vm);
+	vm.compiler.consume(SEMICOLON, "Expect ';' after value.");
+	vm.compiler.emit_byte(Op.PRINT);
 }
 
 fn void Compiler.synchronize(Compiler* compiler) {
@@ -335,30 +367,30 @@ fn void Compiler.synchronize(Compiler* compiler) {
 		compiler.advance();
 	}
 }
-fn void Compiler.declaration(Compiler* compiler) {
-	if (compiler.match(VAR)) {
-		compiler.var_declaration();
+fn void declaration(Vm* vm) {
+	if (vm.compiler.match(VAR)) {
+		var_declaration(vm);
 	} else {
-		compiler.statement();
+		statement(vm);
 	}
-	if (compiler.parser.panic_mode) compiler.synchronize();
+	if (vm.compiler.parser.panic_mode) vm.compiler.synchronize();
 }
 
-fn void Compiler.statement(Compiler* compiler) {
-	if (compiler.match(PRINT)) {
-		compiler.print_statement();
-	} else if (compiler.match(LEFT_BRACE)) {
-		compiler.begin_scope();
-		compiler.block();
-		compiler.end_scope();
+fn void statement(Vm* vm) {
+	if (vm.compiler.match(PRINT)) {
+		print_statement(vm);
+	} else if (vm.compiler.match(LEFT_BRACE)) {
+		vm.compiler.begin_scope();
+		block(vm);
+		vm.compiler.end_scope();
 	} else {
-		compiler.expression_statement();
+		expression_statement(vm);
 	}
 }
 
-fn void Compiler.grouping(Compiler* compiler, bool can_assign) {
-	compiler.expression();
-	compiler.consume(RIGHT_PAREN, "Expect ')' after compiler_expression.");
+fn void grouping(Vm* vm, bool can_assign) {
+	expression(vm);
+	vm.compiler.consume(RIGHT_PAREN, "Expect ')' after compiler_expression.");
 }
 
 fn Uint8 Compiler.make_constant(Compiler* compiler, Value value) {
@@ -375,24 +407,63 @@ fn void Compiler.emit_constant(Compiler* compiler, Value value) {
 	compiler.emit_bytes(Op.CONSTANT, compiler.make_constant(value));
 }
 
-fn bool compile(char[] source, Chunk* new_chunk) {
-	Compiler compiler;
-	compiler.init(source);
-	compiler.chunk = new_chunk;
+fn bool compile(Vm* vm, char[] source, Chunk* new_chunk) {
+	vm.compiler.init(source);
+	vm.compiler.chunk = new_chunk;
 
-	compiler.parser.had_error = false;
-	compiler.parser.panic_mode = false;
+	vm.compiler.parser.had_error = false;
+	vm.compiler.parser.panic_mode = false;
 
-	compiler.advance();
-	while (!compiler.match(EOF)) {
-		compiler.declaration();
+	vm.compiler.advance();
+	while (!vm.compiler.match(EOF)) {
+		declaration(vm);
 	}
-	compiler.end();
-	return !compiler.parser.had_error;
+	vm.compiler.end();
+	return !vm.compiler.parser.had_error;
 }
 
-fn void Compiler.init(Compiler* compiler, char[] source) {
-	compiler.scanner.init(source);
-	compiler.local_count = 0;
-	compiler.scope_depth = 0;
-}
+// c3fmt off
+const ParseRule*[*] RULE = {
+	[TokenType.LEFT_PAREN]    = &&{ &grouping, null,    Precedence.NONE },
+	[TokenType.RIGHT_PAREN]   = &&{ null,      null,    Precedence.NONE },
+	[TokenType.LEFT_BRACE]    = &&{ null,      null,    Precedence.NONE },
+	[TokenType.RIGHT_BRACE]   = &&{ null,      null,    Precedence.NONE },
+	[TokenType.COMMA]         = &&{ null,      null,    Precedence.NONE },
+	[TokenType.DOT]           = &&{ null,      null,    Precedence.NONE },
+	[TokenType.MINUS]         = &&{ &unary,    &binary, Precedence.TERM },
+	[TokenType.PLUS]          = &&{ null,      &binary, Precedence.TERM },
+	[TokenType.SEMICOLON]     = &&{ null,      null,    Precedence.NONE },
+	[TokenType.SLASH]         = &&{ null,      &binary, Precedence.FACTOR },
+	[TokenType.STAR]          = &&{ null,      &binary, Precedence.FACTOR },
+	[TokenType.BANG]          = &&{ &unary,    null,    Precedence.NONE },
+	[TokenType.BANG_EQUAL]    = &&{ null,      &binary, Precedence.EQUALITY },
+	[TokenType.EQUAL]         = &&{ null,      null,    Precedence.NONE },
+	[TokenType.EQUAL_EQUAL]   = &&{ null,      &binary, Precedence.EQUALITY },
+	[TokenType.GREATER]       = &&{ null,      &binary, Precedence.COMPARISON },
+	[TokenType.GREATER_EQUAL] = &&{ null,      &binary, Precedence.COMPARISON },
+	[TokenType.LESS]          = &&{ null,      &binary, Precedence.COMPARISON },
+	[TokenType.LESS_EQUAL]    = &&{ null,      &binary, Precedence.COMPARISON },
+	[TokenType.IDENTIFIER]    = &&{ &variable, null,    Precedence.NONE },
+	[TokenType.STRING]        = &&{ &string,   null,    Precedence.NONE },
+	[TokenType.NUMBER]        = &&{ &number,   null,    Precedence.NONE },
+	[TokenType.AND]           = &&{ null,      null,    Precedence.NONE },
+	[TokenType.CLASS]         = &&{ null,      null,    Precedence.NONE },
+	[TokenType.ELSE]          = &&{ null,      null,    Precedence.NONE },
+	[TokenType.FALSE]         = &&{ &literal,  null,    Precedence.NONE },
+	[TokenType.FOR]           = &&{ null,      null,    Precedence.NONE },
+	[TokenType.FUN]           = &&{ null,      null,    Precedence.NONE },
+	[TokenType.IF]            = &&{ null,      null,    Precedence.NONE },
+	[TokenType.NIL]           = &&{ &literal,  null,    Precedence.NONE },
+	[TokenType.OR]            = &&{ null,      null,    Precedence.NONE },
+	[TokenType.PRINT]         = &&{ null,      null,    Precedence.NONE },
+	[TokenType.RETURN]        = &&{ null,      null,    Precedence.NONE },
+	[TokenType.SUPER]         = &&{ null,      null,    Precedence.NONE },
+	[TokenType.THIS]          = &&{ null,      null,    Precedence.NONE },
+	[TokenType.TRUE]          = &&{ &literal,  null,    Precedence.NONE },
+	[TokenType.VAR]           = &&{ null,      null,    Precedence.NONE },
+	[TokenType.WHILE]         = &&{ null,      null,    Precedence.NONE },
+	[TokenType.ERROR]         = &&{ null,      null,    Precedence.NONE },
+	[TokenType.EOF]           = &&{ null,      null,    Precedence.NONE },
+};
+// c3fmt on
+

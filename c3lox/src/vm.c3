@@ -5,22 +5,20 @@ import std::collections::list;
 import std::collections::map;
 
 excuse COMPILE_ERROR, RUNTIME_ERROR;
-const STACK_MAX = 256;
 
 struct Vm {
 	Value[STACK_MAX] stack;
 	List{Obj*} objects;
 	HashMap{String, Value} globals;
+	Compiler compiler;
 	Chunk* chunk;
 	sz ip;
 	sz stack_top;
 }
 
-Vm vm;
-
 // allocations
-fn void vm_init() {
-	vm_reset_stack();
+fn void Vm.init(Vm* vm) {
+	vm.reset_stack();
 	vm.objects.tinit(32);
 	vm.globals.tinit(16);
 	vm.chunk = null;
@@ -28,36 +26,36 @@ fn void vm_init() {
 	vm.stack_top = 0;
 }
 
-fn void vm_reset_stack() {
+fn void Vm.reset_stack(Vm* vm) {
 	vm.stack_top = 0;
 	vm.ip = 0;
 }
 
-fn void vm_reset() {
-	vm_reset_stack();
+fn void Vm.reset(Vm* vm) {
+	vm.reset_stack();
 	vm.globals.clear();
 	vm.objects.clear();
 	vm.chunk = null;
 }
 
-fn void runtime_error(String format, args...) {
+fn void Vm.runtime_error(Vm* vm, String format, args...) {
 	io::eprintfn(format, args);
 
 	sz instruction = vm.ip - 1;
 	sz line        = vm.chunk.lines[instruction];
 	io::eprintfn("[line %d] in script", line);
-	vm_reset_stack();
+	vm.reset_stack();
 }
 
-fn Uint8 read_byte() {
+fn Uint8 Vm.read_byte(Vm* vm) {
 	Uint8 byte = vm.chunk.code[vm.ip];
 	vm.ip++;
 	return byte;
 }
 
-fn Value read_constant() => vm.chunk.constants[read_byte()];
-fn DString read_dstring() => as_string(read_constant());
-fn String read_ident() => as_ident(read_constant());
+fn Value Vm.read_constant(Vm* vm) => vm.chunk.constants[vm.read_byte()];
+fn DString Vm.read_dstring(Vm* vm) => as_string(vm.read_constant());
+fn String Vm.read_ident(Vm* vm) => as_ident(vm.read_constant());
 
 // c3fmt off
 macro binary_fn(a, b, $op) {
@@ -72,18 +70,18 @@ macro binary_fn(a, b, $op) {
 }
 // c3fmt on
 
-macro void? @binary_op(#value_type, $op) {
-	if (!is_num(peek(0)) || !is_num(peek(1))) {
-		runtime_error("Operands must be numbers.");
+macro void? @binary_op(#vm, #value_type, $op) {
+	if (!is_num(#vm.peek(0)) || !is_num(#vm.peek(1))) {
+		#vm.runtime_error("Operands must be numbers.");
 		return RUNTIME_ERROR~;
 	}
 
-	double b = pop().val.as_num;
-	double a = pop().val.as_num;
-	push(#value_type(binary_fn(a, b, $op)));
+	double b = #vm.pop().val.as_num;
+	double a = #vm.pop().val.as_num;
+	#vm.push(#value_type(binary_fn(a, b, $op)));
 }
 
-fn void? vm_run() {
+fn void? Vm.run(Vm* vm) {
 	for (;;) {
 		$if $feat(DEBUG_TRACE_EXECUTION):
 			io::printf("          ");
@@ -96,61 +94,67 @@ fn void? vm_run() {
 			vm.chunk.disassemble_instruction(vm.ip);
 		$endif
 
-		Uint8 instruction = read_byte();
+		Uint8 instruction = vm.read_byte();
 		switch (instruction) {
 			case Op.CONSTANT:
-				Value constant = read_constant();
-				push(constant);
-			case Op.NIL: push(nil_val());
-			case Op.TRUE: push(bool_val(true));
-			case Op.FALSE: push(bool_val(false));
-			case Op.POP: pop();
+				Value constant = vm.read_constant();
+				vm.push(constant);
+			case Op.NIL: vm.push(nil_val());
+			case Op.TRUE: vm.push(bool_val(true));
+			case Op.FALSE: vm.push(bool_val(false));
+			case Op.POP: vm.pop();
+			case Op.GET_LOCAL:
+				Uint8 slot = vm.read_byte();
+				vm.push(vm.stack[slot]);
+			case Op.SET_LOCAL:
+				Uint8 slot = vm.read_byte();
+				vm.stack[slot] = vm.peek(0);
 			case Op.GET_GLOBAL:
-				String name = read_ident();
+				String name = vm.read_ident();
 				Value? value = vm.globals.get(name);
 				if (catch value) {
-					runtime_error("Undefined variable '%s'.", name);
+					vm.runtime_error("Undefined variable '%s'.", name);
 					return RUNTIME_ERROR~;
 				}
-				push(value);
+				vm.push(value);
 			case Op.DEFINE_GLOBAL:
-				String name = read_ident();
-				vm.globals.set(name, peek(0));
-				pop();
+				String name = vm.read_ident();
+				vm.globals.set(name, vm.peek(0));
+				vm.pop();
 			case Op.SET_GLOBAL:
-				String name = read_ident();
-				if (!vm.globals.set(name, peek(0))) {
+				String name = vm.read_ident();
+				if (!vm.globals.set(name, vm.peek(0))) {
 					vm.globals.remove(name);
-					runtime_error("Undefined variable '%s'.", name);
+					vm.runtime_error("Undefined variable '%s'.", name);
 					return RUNTIME_ERROR~;
 				}
 			case Op.EQUAL:
-				Value b = pop();
-				Value a = pop();
-				push(bool_val(values_equal(a, b)));
-			case Op.GREATER: @binary_op(bool_val, '>')!;
-			case Op.LESS: @binary_op(bool_val, '<')!;
+				Value b = vm.pop();
+				Value a = vm.pop();
+				vm.push(bool_val(values_equal(a, b)));
+			case Op.GREATER: @binary_op(vm, bool_val, '>')!;
+			case Op.LESS: @binary_op(vm, bool_val, '<')!;
 			case Op.ADD:
-				if (is_string(peek(0)) && is_string(peek(1))) {
-					concatenate();
-				} else if (is_num(peek(0)) && is_num(peek(1))) {
-					@binary_op(number_val, '+')!;
+				if (is_string(vm.peek(0)) && is_string(vm.peek(1))) {
+					vm.concatenate();
+				} else if (is_num(vm.peek(0)) && is_num(vm.peek(1))) {
+					@binary_op(vm, number_val, '+')!;
 				} else {
-					runtime_error("Operands must be two numbers or two strings.");
+					vm.runtime_error("Operands must be two numbers or two strings.");
 					return RUNTIME_ERROR~;
 				}
-			case Op.SUBTRACT: @binary_op(number_val, '-')!;
-			case Op.MULTIPLY: @binary_op(number_val, '*')!;
-			case Op.DIVIDE: @binary_op(number_val, '/')!;
-			case Op.NOT: push(bool_val(is_falsey(pop())));
+			case Op.SUBTRACT: @binary_op(vm, number_val, '-')!;
+			case Op.MULTIPLY: @binary_op(vm, number_val, '*')!;
+			case Op.DIVIDE: @binary_op(vm, number_val, '/')!;
+			case Op.NOT: vm.push(bool_val(is_falsey(vm.pop())));
 			case Op.NEGATE:
-				if (!is_num(peek(0))) {
-					runtime_error("Operand must be a number");
+				if (!is_num(vm.peek(0))) {
+					vm.runtime_error("Operand must be a number");
 					return RUNTIME_ERROR~;
 				}
-				push(number_val(-as_num(pop())));
+				vm.push(number_val(-as_num(vm.pop())));
 			case Op.PRINT:
-				print_value(pop());
+				print_value(vm.pop());
 				io::printn();
 			case Op.RETURN:
 				return;
@@ -158,37 +162,37 @@ fn void? vm_run() {
 	}
 }
 
-fn void? interpret(char[] source) {
-	vm_reset_stack();
+fn void? Vm.interpret(Vm* vm, char[] source) {
+	vm.reset_stack();
 	Chunk chunk;
 	chunk.init(); // allocation
 	vm.chunk = &chunk;
 
-	if (!compile(source, &chunk)) return COMPILE_ERROR~;
+	if (!compile(vm, source, &chunk)) return COMPILE_ERROR~;
 
 	// fault err = @catch(vm_run());
 	// free_vm();
 	// return err~;
 
-	return vm_run();
+	return vm.run();
 }
 
-fn void push(Value value) {
+fn void Vm.push(Vm* vm, Value value) {
 	vm.stack[vm.stack_top] = value;
 	vm.stack_top++;
 }
 
-fn Value pop() {
+fn Value Vm.pop(Vm* vm) {
 	vm.stack_top--;
 	return vm.stack[vm.stack_top];
 }
 
-fn Value peek(sz distance) => vm.stack[vm.stack_top - distance - 1];
+fn Value Vm.peek(Vm* vm, sz distance) => vm.stack[vm.stack_top - distance - 1];
 fn bool is_falsey(Value value) => is_nil(value) || (is_bool(value) && !as_bool(value));
 
-fn void concatenate() {
-	DString b = as_string(pop());
-	Value a   = pop();
+fn void Vm.concatenate(Vm* vm) {
+	DString b = as_string(vm.pop());
+	Value a   = vm.pop();
 	as_string(a).append(b);
-	push(a);
+	vm.push(a);
 }

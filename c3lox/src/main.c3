@@ -10,13 +10,15 @@ fn void run_file(String path) => @pool() {
 		os::exit(74);
 	}
 
-	vm_init();
-	interpret(con) ?? os::exit(65);
-	free_objects();
+	Vm vm;
+	vm.init();
+	vm.interpret(con) ?? os::exit(65);
+	vm.free_objects();
 }
 
 fn void repl() => @pool() {
-	vm_init();
+  Vm vm;
+	vm.init();
 
 	io::printn("-----------------------------------------");
 	io::printn("                 LOX REPL                ");
@@ -30,10 +32,10 @@ fn void repl() => @pool() {
 				continue;
 			}
 			if (line == ":q" || line == "exit") {
-				free_objects();
+				vm.free_objects();
 				return;
 			}
-			@catch(interpret(line));
+			@catch(vm.interpret(line));
 		};
 	}
 }
