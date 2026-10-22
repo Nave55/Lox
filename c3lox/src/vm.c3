@@ -18,7 +18,7 @@ struct Vm {
 
 // allocations
 fn void Vm.init(Vm* vm) {
-	vm.compiler.idents.tinit(8);
+	vm.compiler.global_map.tinit(16);
 	vm.reset_stack();
 	vm.objects.tinit(32);
 	vm.globals.tinit(16);

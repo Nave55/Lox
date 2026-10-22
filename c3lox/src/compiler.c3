@@ -37,7 +37,7 @@ struct Local {
 
 struct Compiler {
 	Local[UINT8_COUNT] locals;
-  HashMap{String, sz} idents;
+	HashMap{String, Uint8} global_map;
 	sz locals_count;
 	sz scope_depth;
 
@@ -47,7 +47,6 @@ struct Compiler {
 }
 
 fn void Compiler.init(Compiler* compiler, char[] source) {
-  compiler.idents.clear();
 	compiler.scanner.init(source);
 	compiler.locals_count = 0;
 	compiler.scope_depth = 0;
@@ -198,11 +197,11 @@ fn void parse_precedence(Vm* vm, Precedence precedence) {
 }
 
 fn Uint8 identifier_constant(Vm* vm, LoxToken* name) {
-	Uint8? val = vm.compiler.chunk.globals.get(name.lexeme);
+	Uint8? val = vm.compiler.global_map.get(name.lexeme);
 	if (try val) return val;
 
 	Uint8 idx = vm.compiler.make_constant(obj_val(vm.allocate_ident(name.lexeme)));
-	vm.compiler.chunk.globals.set(name.lexeme, idx);
+	vm.compiler.global_map.set(name.lexeme, idx);
 	return idx;
 }
 
@@ -212,10 +211,12 @@ fn bool identifiers_equal(LoxToken* a, LoxToken* b) {
 }
 
 fn sz Compiler.resolve_local(Compiler* compiler, LoxToken* name) {
-  sz? i = compiler.idents[name.lexeme];
-  if (try i) {
-		if (compiler.locals[i].depth == -1) {
+	for (sz i = compiler.locals_count - 1; i >= 0; i--) {
+		Local* local = &compiler.locals[i];
+		if (identifiers_equal(name, &local.name)) {
+			if (local.depth == -1) {
 				compiler.error("Can't read local variable in its own initializer.");
+			}
 		}
 		return i;
 	}
@@ -227,7 +228,6 @@ fn void Compiler.add_local(Compiler* compiler, LoxToken name) {
 		compiler.error("Too man local variables in functions");
 		return;
 	}
-	compiler.idents[name.lexeme] = compiler.locals_count;
 	Local* local = &compiler.locals[compiler.locals_count++];
 	local.name = name;
 	local.depth = -1;
