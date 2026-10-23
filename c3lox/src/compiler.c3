@@ -17,6 +17,12 @@ enum Precedence : Uint8 {
 	PRIMARY
 }
 
+struct ParseRule {
+	ParseFn prefix;
+	ParseFn infix;
+	Precedence precedence;
+}
+
 // c3fmt off
 const ParseRule*[*] RULE = {
 	[TokenType.LEFT_PAREN]    = &&{ &grouping, null,    Precedence.NONE },
@@ -61,12 +67,6 @@ const ParseRule*[*] RULE = {
 	[TokenType.EOF]           = &&{ null,      null,    Precedence.NONE },
 };
 // c3fmt on
-
-struct ParseRule {
-	ParseFn prefix;
-	ParseFn infix;
-	Precedence precedence;
-}
 
 struct Parser {
 	LoxToken current;
