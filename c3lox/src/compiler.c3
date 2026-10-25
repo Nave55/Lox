@@ -242,35 +242,23 @@ fn void named_variable(Vm* vm, LoxToken name, bool can_assign) {
 		emit_bytes(vm, set_op, (Uint8)arg);
 	} else if (can_assign && match(vm, PLUS_EQUAL)) {
 		emit_bytes(vm, get_op, (Uint8)arg);
-
 		expression(vm);
-
 		emit_byte(vm, Op.ADD);
-
 		emit_bytes(vm, set_op, (Uint8)arg);
 	} else if (can_assign && match(vm, MINUS_EQUAL)) {
 		emit_bytes(vm, get_op, (Uint8)arg);
-
 		expression(vm);
-
 		emit_byte(vm, Op.SUBTRACT);
-
 		emit_bytes(vm, set_op, (Uint8)arg);
 	} else if (can_assign && match(vm, STAR_EQUAL)) {
 		emit_bytes(vm, get_op, (Uint8)arg);
-
 		expression(vm);
-
 		emit_byte(vm, Op.MULTIPLY);
-
 		emit_bytes(vm, set_op, (Uint8)arg);
 	} else if (can_assign && match(vm, SLASH_EQUAL)) {
 		emit_bytes(vm, get_op, (Uint8)arg);
-
 		expression(vm);
-
 		emit_byte(vm, Op.DIVIDE);
-
 		emit_bytes(vm, set_op, (Uint8)arg);
 	} else {
 		emit_bytes(vm, get_op, (Uint8)arg);
@@ -341,19 +329,15 @@ fn void number(Vm* vm, bool can_assign) {
 
 fn void and_(Vm* vm, bool can_assign) {
 	sz end_jump = emit_jump(vm, Op.JUMP_IF_FALSE);
-
 	emit_byte(vm, Op.POP);
 	parse_precedence(vm, AND);
-
 	patch_jump(vm, end_jump);
 }
 
 fn void or_(Vm* vm, bool can_assign) {
-	sz end_jump = emit_jump(vm,Op.JUMP_IF_TRUE);
-
+	sz end_jump = emit_jump(vm, Op.JUMP_IF_TRUE);
 	emit_byte(vm, Op.POP);
 	parse_precedence(vm, OR);
-
 	patch_jump(vm, end_jump);
 }
 
@@ -366,7 +350,7 @@ fn void string(Vm* vm, bool can_assign) {
 fn void literal(Vm* vm, bool can_assign) {
 	switch (vm.compiler.parser.previous.type) {
 		case FALSE: emit_byte(vm, Op.FALSE); break;
-		case NIL:  emit_byte(vm, Op.NIL); break;
+		case NIL: emit_byte(vm, Op.NIL); break;
 		case TRUE: emit_byte(vm, Op.TRUE); break;
 		default: return;  // Unreachable.
 	}
@@ -449,36 +433,36 @@ fn void for_statement(Vm* vm) {
 		expression_statement(vm);
 	}
 
-	sz loop_start = vm.chunk.count();
-	sz exit_jump = -1;
+	sz loop_start =  vm.chunk.count();
+	sz exit_jump  = -1;
 	if (!match(vm, SEMICOLON)) {
-      expression(vm);
-      consume(vm, SEMICOLON, "Expect ';' after loop condition.");
-  
-      exit_jump = emit_jump(vm, Op.JUMP_IF_FALSE);
-      emit_byte(vm, Op.POP); // Condition.
-  }	
+		expression(vm);
+		consume(vm, SEMICOLON, "Expect ';' after loop condition.");
 
-  if (!match(vm, RIGHT_PAREN)) {
-      sz body_jump = emit_jump(vm, Op.JUMP);
-      sz increment_start = vm.chunk.count();
-      expression(vm);
-      emit_byte(vm, Op.POP);
-      consume(vm, RIGHT_PAREN, "Expect ')' after for clauses.");
-  
-      emit_loop(vm, loop_start);
-      loop_start = increment_start;
-      patch_jump(vm, body_jump);
-  }
+		exit_jump = emit_jump(vm, Op.JUMP_IF_FALSE);
+		emit_byte(vm, Op.POP); // Condition.
+	}
+
+	if (!match(vm, RIGHT_PAREN)) {
+		sz body_jump       = emit_jump(vm, Op.JUMP);
+		sz increment_start = vm.chunk.count();
+		expression(vm);
+		emit_byte(vm, Op.POP);
+		consume(vm, RIGHT_PAREN, "Expect ')' after for clauses.");
+
+		emit_loop(vm, loop_start);
+		loop_start = increment_start;
+		patch_jump(vm, body_jump);
+	}
 
 	statement(vm);
 	emit_loop(vm, loop_start);
 
 	if (exit_jump != -1) {
-	  patch_jump(vm, exit_jump);
+		patch_jump(vm, exit_jump);
 		emit_byte(vm, Op.POP);
 	}
-	
+
 	end_scope(vm);
 }
 
@@ -530,7 +514,7 @@ fn void statement(Vm* vm) {
 	} else if (match(vm, WHILE)) {
 		while_statement(vm);
 	} else if (match(vm, LEFT_BRACE)) {
-		begin_scope(vm, );
+		begin_scope(vm);
 		block(vm);
 		end_scope(vm);
 	} else {
@@ -582,9 +566,7 @@ fn void declaration(Vm* vm) {
 	} else {
 		statement(vm);
 	}
-	if (vm.compiler.parser.panic_mode) synchronize(
-		vm,
-	);
+	if (vm.compiler.parser.panic_mode) synchronize(vm);
 }
 
 fn void block(Vm* vm) {
