@@ -10,8 +10,9 @@ enum TokenType : char {
 	SEMICOLON,  SLASH,       STAR,
 
 	// One or two character tokens
-	BANG,    BANG_EQUAL,    EQUAL, EQUAL_EQUAL,
-	GREATER, GREATER_EQUAL, LESS,  LESS_EQUAL,
+	BANG,       BANG_EQUAL,    EQUAL,      EQUAL_EQUAL,
+	GREATER,    GREATER_EQUAL, LESS,       LESS_EQUAL,
+	PLUS_EQUAL, MINUS_EQUAL,   STAR_EQUAL, SLASH_EQUAL,
 
 	// Literals
 	IDENTIFIER, STRING, NUMBER,
@@ -230,10 +231,10 @@ fn LoxToken LoxScanner.scan_token(LoxScanner* scanner) {
 		case ';': return scanner.make_token(SEMICOLON);
 		case ',': return scanner.make_token(COMMA);
 		case '.': return scanner.make_token(DOT);
-		case '-': return scanner.make_token(MINUS);
-		case '+': return scanner.make_token(PLUS);
-		case '/': return scanner.make_token(SLASH);
-		case '*': return scanner.make_token(STAR);
+		case '-': return scanner.make_token(scanner.match('=') ? MINUS_EQUAL : MINUS);
+		case '+': return scanner.make_token(scanner.match('=') ? PLUS_EQUAL : PLUS);
+		case '*': return scanner.make_token(scanner.match('=') ? STAR_EQUAL : STAR);
+		case '/': return scanner.make_token(scanner.match('=') ? SLASH_EQUAL : SLASH);
 		case '!': return scanner.make_token(scanner.match('=') ? BANG_EQUAL : BANG);
 		case '=': return scanner.make_token(scanner.match('=') ? EQUAL_EQUAL : EQUAL);
 		case '<': return scanner.make_token(scanner.match('=') ? LESS_EQUAL : LESS);
@@ -241,5 +242,5 @@ fn LoxToken LoxScanner.scan_token(LoxScanner* scanner) {
 		case '"': return scanner.string();
 	}
 
-	return scanner.error_token("Unexpected character.");
+	return scanner.error_token(string::tformat("Unexpected character '%c'.", c));
 }

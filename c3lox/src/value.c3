@@ -2,6 +2,7 @@ module c3lox;
 
 import std::collections::list;
 import std::io;
+import std::math;
 
 excuse TAG_MISMATCH;
 
@@ -51,7 +52,7 @@ fn bool values_equal(Value a, Value b) {
 	switch (a.tag) {
 		case BOOL: return as_bool(a) == as_bool(b);
 		case NIL: return true;
-		case NUMBER: return (as_num(a) - as_num(b)) < 1e-9;
+		case NUMBER: return math::abs(as_num(a) - as_num(b)) < 1e-9;
 		case OBJ:
 			switch (as_obj(a).tag) {
 				case STRING: return as_string(a).equals(as_string(b));

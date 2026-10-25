@@ -54,9 +54,14 @@ fn Uint8 Vm.read_byte(Vm* vm) {
 	return byte;
 }
 
-fn Value Vm.read_constant(Vm* vm) => vm.chunk.constants[vm.read_byte()];
-fn DString Vm.read_dstring(Vm* vm) => as_string(vm.read_constant());
-fn String Vm.read_ident(Vm* vm) => as_ident(vm.read_constant());
+macro Value Vm.read_constant(Vm* vm) => vm.chunk.constants[vm.read_byte()];
+macro DString Vm.read_dstring(Vm* vm) => as_string(vm.read_constant());
+macro String Vm.read_ident(Vm* vm) => as_ident(vm.read_constant());
+
+macro read_short(Vm* vm) {
+	vm.ip += 2;
+	return (sz)(vm.chunk.code[vm.ip - 2] << 8 | vm.chunk.code[vm.ip - 1]);
+}
 
 // c3fmt off
 macro binary_fn(a, b, $op) {
@@ -157,6 +162,18 @@ fn void? Vm.run(Vm* vm) {
 			case Op.PRINT:
 				print_value(vm.pop());
 				io::printn();
+			case Op.JUMP:
+				sz offset = read_short(vm);
+				vm.ip += offset;
+			case Op.JUMP_IF_FALSE:
+				sz offset = read_short(vm);
+				if (is_falsey(vm.peek(0))) vm.ip += offset;
+			case Op.JUMP_IF_TRUE:
+				sz offset = read_short(vm);
+				if (!is_falsey(vm.peek(0))) vm.ip += offset;
+			case Op.LOOP:
+				sz offset = read_short(vm);
+				vm.ip -= offset;
 			case Op.RETURN:
 				return;
 		}

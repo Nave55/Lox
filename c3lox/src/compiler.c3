@@ -3,7 +3,7 @@ module c3lox;
 import std::io;
 import std::collections::map;
 
-enum Precedence : Uint8 {
+enum Prec : Uint8 {
 	NONE,
 	ASSIGNMENT, // =
 	OR,         // or
@@ -20,51 +20,51 @@ enum Precedence : Uint8 {
 struct ParseRule {
 	ParseFn prefix;
 	ParseFn infix;
-	Precedence precedence;
+	Prec precedence;
 }
 
 // c3fmt off
 const ParseRule*[*] RULE = {
-	[TokenType.LEFT_PAREN]    = &&{ &grouping, null,    Precedence.NONE },
-	[TokenType.RIGHT_PAREN]   = &&{ null,      null,    Precedence.NONE },
-	[TokenType.LEFT_BRACE]    = &&{ null,      null,    Precedence.NONE },
-	[TokenType.RIGHT_BRACE]   = &&{ null,      null,    Precedence.NONE },
-	[TokenType.COMMA]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.DOT]           = &&{ null,      null,    Precedence.NONE },
-	[TokenType.MINUS]         = &&{ &unary,    &binary, Precedence.TERM },
-	[TokenType.PLUS]          = &&{ null,      &binary, Precedence.TERM },
-	[TokenType.SEMICOLON]     = &&{ null,      null,    Precedence.NONE },
-	[TokenType.SLASH]         = &&{ null,      &binary, Precedence.FACTOR },
-	[TokenType.STAR]          = &&{ null,      &binary, Precedence.FACTOR },
-	[TokenType.BANG]          = &&{ &unary,    null,    Precedence.NONE },
-	[TokenType.BANG_EQUAL]    = &&{ null,      &binary, Precedence.EQUALITY },
-	[TokenType.EQUAL]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.EQUAL_EQUAL]   = &&{ null,      &binary, Precedence.EQUALITY },
-	[TokenType.GREATER]       = &&{ null,      &binary, Precedence.COMPARISON },
-	[TokenType.GREATER_EQUAL] = &&{ null,      &binary, Precedence.COMPARISON },
-	[TokenType.LESS]          = &&{ null,      &binary, Precedence.COMPARISON },
-	[TokenType.LESS_EQUAL]    = &&{ null,      &binary, Precedence.COMPARISON },
-	[TokenType.IDENTIFIER]    = &&{ &variable, null,    Precedence.NONE },
-	[TokenType.STRING]        = &&{ &string,   null,    Precedence.NONE },
-	[TokenType.NUMBER]        = &&{ &number,   null,    Precedence.NONE },
-	[TokenType.AND]           = &&{ null,      null,    Precedence.NONE },
-	[TokenType.CLASS]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.ELSE]          = &&{ null,      null,    Precedence.NONE },
-	[TokenType.FALSE]         = &&{ &literal,  null,    Precedence.NONE },
-	[TokenType.FOR]           = &&{ null,      null,    Precedence.NONE },
-	[TokenType.FUN]           = &&{ null,      null,    Precedence.NONE },
-	[TokenType.IF]            = &&{ null,      null,    Precedence.NONE },
-	[TokenType.NIL]           = &&{ &literal,  null,    Precedence.NONE },
-	[TokenType.OR]            = &&{ null,      null,    Precedence.NONE },
-	[TokenType.PRINT]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.RETURN]        = &&{ null,      null,    Precedence.NONE },
-	[TokenType.SUPER]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.THIS]          = &&{ null,      null,    Precedence.NONE },
-	[TokenType.TRUE]          = &&{ &literal,  null,    Precedence.NONE },
-	[TokenType.VAR]           = &&{ null,      null,    Precedence.NONE },
-	[TokenType.WHILE]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.ERROR]         = &&{ null,      null,    Precedence.NONE },
-	[TokenType.EOF]           = &&{ null,      null,    Precedence.NONE },
+	[TokenType.LEFT_PAREN]    = &&{ &grouping, null,    Prec.NONE },
+	[TokenType.RIGHT_PAREN]   = &&{ null,      null,    Prec.NONE },
+	[TokenType.LEFT_BRACE]    = &&{ null,      null,    Prec.NONE },
+	[TokenType.RIGHT_BRACE]   = &&{ null,      null,    Prec.NONE },
+	[TokenType.COMMA]         = &&{ null,      null,    Prec.NONE },
+	[TokenType.DOT]           = &&{ null,      null,    Prec.NONE },
+	[TokenType.MINUS]         = &&{ &unary,    &binary, Prec.TERM },
+	[TokenType.PLUS]          = &&{ null,      &binary, Prec.TERM },
+	[TokenType.SEMICOLON]     = &&{ null,      null,    Prec.NONE },
+	[TokenType.SLASH]         = &&{ null,      &binary, Prec.FACTOR },
+	[TokenType.STAR]          = &&{ null,      &binary, Prec.FACTOR },
+	[TokenType.BANG]          = &&{ &unary,    null,    Prec.NONE },
+	[TokenType.BANG_EQUAL]    = &&{ null,      &binary, Prec.EQUALITY },
+	[TokenType.EQUAL]         = &&{ null,      null,    Prec.NONE },
+	[TokenType.EQUAL_EQUAL]   = &&{ null,      &binary, Prec.EQUALITY },
+	[TokenType.GREATER]       = &&{ null,      &binary, Prec.COMPARISON },
+	[TokenType.GREATER_EQUAL] = &&{ null,      &binary, Prec.COMPARISON },
+	[TokenType.LESS]          = &&{ null,      &binary, Prec.COMPARISON },
+	[TokenType.LESS_EQUAL]    = &&{ null,      &binary, Prec.COMPARISON },
+	[TokenType.IDENTIFIER]    = &&{ &variable, null,    Prec.NONE },
+	[TokenType.STRING]        = &&{ &string,   null,    Prec.NONE },
+	[TokenType.NUMBER]        = &&{ &number,   null,    Prec.NONE },
+	[TokenType.AND]           = &&{ null,      &and_,   Prec.AND },
+	[TokenType.CLASS]         = &&{ null,      null,    Prec.NONE },
+	[TokenType.ELSE]          = &&{ null,      null,    Prec.NONE },
+	[TokenType.FALSE]         = &&{ &literal,  null,    Prec.NONE },
+	[TokenType.FOR]           = &&{ null,      null,    Prec.NONE },
+	[TokenType.FUN]           = &&{ null,      null,    Prec.NONE },
+	[TokenType.IF]            = &&{ null,      null,    Prec.NONE },
+	[TokenType.NIL]           = &&{ &literal,  null,    Prec.NONE },
+	[TokenType.OR]            = &&{ null,      &or_,    Prec.OR },
+	[TokenType.PRINT]         = &&{ null,      null,    Prec.NONE },
+	[TokenType.RETURN]        = &&{ null,      null,    Prec.NONE },
+	[TokenType.SUPER]         = &&{ null,      null,    Prec.NONE },
+	[TokenType.THIS]          = &&{ null,      null,    Prec.NONE },
+	[TokenType.TRUE]          = &&{ &literal,  null,    Prec.NONE },
+	[TokenType.VAR]           = &&{ null,      null,    Prec.NONE },
+	[TokenType.WHILE]         = &&{ null,      null,    Prec.NONE },
+	[TokenType.ERROR]         = &&{ null,      null,    Prec.NONE },
+	[TokenType.EOF]           = &&{ null,      null,    Prec.NONE },
 };
 // c3fmt on
 
@@ -88,7 +88,6 @@ struct Compiler {
 
 	LoxScanner scanner;
 	Parser parser;
-	Chunk* chunk;
 }
 
 fn void Compiler.init(Compiler* compiler, char[] source) {
@@ -97,9 +96,9 @@ fn void Compiler.init(Compiler* compiler, char[] source) {
 	compiler.scope_depth = 0;
 }
 
-fn void Compiler.error_at(Compiler* compiler, LoxToken* token, String message) {
-	if (compiler.parser.panic_mode) return;
-	compiler.parser.panic_mode = true;
+fn void error_at(Vm* vm, LoxToken* token, String message) {
+	if (vm.compiler.parser.panic_mode) return;
+	vm.compiler.parser.panic_mode = true;
 	io::eprintf("[line %d] Error", token.line);
 
 	if (token.type == EOF) {
@@ -111,77 +110,95 @@ fn void Compiler.error_at(Compiler* compiler, LoxToken* token, String message) {
 	}
 
 	io::eprintfn(": %s", message);
-	compiler.parser.had_error = true;
+	vm.compiler.parser.had_error = true;
 }
 
-fn void Compiler.error(Compiler* compiler, String message) {
-	compiler.error_at(&compiler.parser.previous, message);
+fn void error(Vm* vm, String message) {
+	error_at(vm, &vm.compiler.parser.previous, message);
 }
 
-fn void Compiler.error_at_current(Compiler* compiler, String message) {
-	compiler.error_at(&compiler.parser.current, message);
+fn void error_at_current(Vm* vm, String message) {
+	error_at(vm, &vm.compiler.parser.current, message);
 }
 
-fn void Compiler.emit_byte(Compiler* compiler, Uint8 byte) {
-	compiler.chunk.write(byte, compiler.parser.previous.line);
+fn void emit_byte(Vm* vm, Uint8 byte) {
+	vm.chunk.write(byte, vm.compiler.parser.previous.line);
 }
 
-fn void Compiler.emit_return(Compiler* compiler) => compiler.emit_byte(Op.RETURN);
-fn void Compiler.emit_bytes(Compiler* compiler, Uint8 byte1, Uint8 byte2) {
-	compiler.emit_byte(byte1);
-	compiler.emit_byte(byte2);
+fn void emit_return(Vm* vm) => emit_byte(vm, Op.RETURN);
+
+fn void emit_bytes(Vm* vm, Uint8 byte1, Uint8 byte2) {
+	emit_byte(vm, byte1);
+	emit_byte(vm, byte2);
 }
 
-fn void Compiler.advance(Compiler* compiler) {
-	compiler.parser.previous = compiler.parser.current;
+fn void emit_loop(Vm* vm, sz loop_start) {
+	emit_byte(vm, Op.LOOP);
+
+	sz offset = vm.chunk.count() - loop_start + 2;
+	if (offset > UINT16_MAX) error(vm, "Loop body too large.");
+
+	emit_byte(vm, (Uint8)((offset >> 8) & 0xff));
+	emit_byte(vm, (Uint8)(offset & 0xff));
+}
+
+fn sz emit_jump(Vm* vm, Uint8 instruction) {
+	emit_byte(vm, instruction);
+	emit_byte(vm, 0xff);
+	emit_byte(vm, 0xff);
+	return vm.chunk.count() - 2;
+}
+
+fn void advance(Vm* vm) {
+	vm.compiler.parser.previous = vm.compiler.parser.current;
 
 	for (;;) {
-		compiler.parser.current = compiler.scanner.scan_token();
-		if (compiler.parser.current.type != ERROR) break;
-		compiler.error_at_current(compiler.parser.current.lexeme);
+		vm.compiler.parser.current = vm.compiler.scanner.scan_token();
+		if (vm.compiler.parser.current.type != ERROR) break;
+		error_at_current(vm, vm.compiler.parser.current.lexeme);
 	}
 }
 
-fn void Compiler.consume(Compiler* compiler, TokenType type, String message) {
-	if (compiler.parser.current.type == type) {
-		compiler.advance();
+fn void consume(Vm* vm, TokenType type, String message) {
+	if (vm.compiler.parser.current.type == type) {
+		advance(vm);
 		return;
 	}
 
-	compiler.error_at_current(message);
+	error_at_current(vm, message);
 }
 
-fn bool Compiler.check(Compiler* compiler, TokenType type) {
-	return compiler.parser.current.type == type;
+fn bool check(Vm* vm, TokenType type) {
+	return vm.compiler.parser.current.type == type;
 }
 
-fn bool Compiler.match(Compiler* compiler, TokenType type) {
-	if (!compiler.check(type)) return false;
-	compiler.advance();
+fn bool match(Vm* vm, TokenType type) {
+	if (!check(vm, type)) return false;
+	advance(vm);
 	return true;
 }
 
-fn ParseRule* Compiler.get_rule(Compiler* compiler, TokenType type) => RULE[type];
+fn ParseRule* get_rule(TokenType type) => RULE[type];
 
-fn void parse_precedence(Vm* vm, Precedence precedence) {
-	vm.compiler.advance();
-	ParseFn prefix_rule = vm.compiler.get_rule(vm.compiler.parser.previous.type).prefix;
+fn void parse_precedence(Vm* vm, Prec precedence) {
+	advance(vm);
+	ParseFn prefix_rule = get_rule(vm.compiler.parser.previous.type).prefix;
 	if (prefix_rule == null) {
-		vm.compiler.error("Expect expression.");
+		error(vm, "Expect expression.");
 		return;
 	}
 
 	bool can_assign = precedence <= ASSIGNMENT;
 	prefix_rule(vm, can_assign);
 
-	while (precedence <= vm.compiler.get_rule(vm.compiler.parser.current.type).precedence) {
-		vm.compiler.advance();
-		ParseFn infix_rule = vm.compiler.get_rule(vm.compiler.parser.previous.type).infix;
+	while (precedence <= get_rule(vm.compiler.parser.current.type).precedence) {
+		advance(vm);
+		ParseFn infix_rule = get_rule(vm.compiler.parser.previous.type).infix;
 		infix_rule(vm, can_assign);
 	}
 
-	if (can_assign && vm.compiler.match(EQUAL)) {
-		vm.compiler.error("Invalid assignment target.");
+	if (can_assign && match(vm, EQUAL)) {
+		error(vm, "Invalid assignment target.");
 	}
 }
 
@@ -189,10 +206,10 @@ fn void expression(Vm* vm) {
 	parse_precedence(vm, ASSIGNMENT);
 }
 
-fn Uint8 Compiler.make_constant(Compiler* compiler, Value value) {
-	sz constant = compiler.chunk.add_constant(value);
+fn Uint8 make_constant(Vm* vm, Value value) {
+	sz constant = vm.chunk.add_constant(value);
 	if (constant > UINT8_MAX) {
-		compiler.error("Too many constants in one chunk.");
+		error(vm, "Too many constants in one chunk.");
 		return 0;
 	}
 
@@ -203,14 +220,14 @@ fn Uint8 identifier_constant(Vm* vm, LoxToken* name) {
 	Uint8? val = vm.compiler.global_map.get(name.lexeme);
 	if (try val) return val;
 
-	Uint8 idx = vm.compiler.make_constant(obj_val(vm.allocate_ident(name.lexeme)));
+	Uint8 idx = make_constant(vm, obj_val(vm.allocate_ident(name.lexeme)));
 	vm.compiler.global_map.set(name.lexeme, idx);
 	return idx;
 }
 
 fn void named_variable(Vm* vm, LoxToken name, bool can_assign) {
 	Uint8 get_op, set_op;
-	sz arg = vm.compiler.resolve_local(&name);
+	sz arg = resolve_local(vm, &name);
 	if (arg != -1) {
 		get_op = Op.GET_LOCAL;
 		set_op = Op.SET_LOCAL;
@@ -220,11 +237,43 @@ fn void named_variable(Vm* vm, LoxToken name, bool can_assign) {
 		set_op = Op.SET_GLOBAL;
 	}
 
-	if (can_assign && vm.compiler.match(EQUAL)) {
+	if (can_assign && match(vm, EQUAL)) {
 		expression(vm);
-		vm.compiler.emit_bytes(set_op, (Uint8)arg);
+		emit_bytes(vm, set_op, (Uint8)arg);
+	} else if (can_assign && match(vm, PLUS_EQUAL)) {
+		emit_bytes(vm, get_op, (Uint8)arg);
+
+		expression(vm);
+
+		emit_byte(vm, Op.ADD);
+
+		emit_bytes(vm, set_op, (Uint8)arg);
+	} else if (can_assign && match(vm, MINUS_EQUAL)) {
+		emit_bytes(vm, get_op, (Uint8)arg);
+
+		expression(vm);
+
+		emit_byte(vm, Op.SUBTRACT);
+
+		emit_bytes(vm, set_op, (Uint8)arg);
+	} else if (can_assign && match(vm, STAR_EQUAL)) {
+		emit_bytes(vm, get_op, (Uint8)arg);
+
+		expression(vm);
+
+		emit_byte(vm, Op.MULTIPLY);
+
+		emit_bytes(vm, set_op, (Uint8)arg);
+	} else if (can_assign && match(vm, SLASH_EQUAL)) {
+		emit_bytes(vm, get_op, (Uint8)arg);
+
+		expression(vm);
+
+		emit_byte(vm, Op.DIVIDE);
+
+		emit_bytes(vm, set_op, (Uint8)arg);
 	} else {
-		vm.compiler.emit_bytes(get_op, (Uint8)arg);
+		emit_bytes(vm, get_op, (Uint8)arg);
 	}
 }
 
@@ -234,7 +283,7 @@ fn void variable(Vm* vm, bool can_assign) {
 
 fn void grouping(Vm* vm, bool can_assign) {
 	expression(vm);
-	vm.compiler.consume(RIGHT_PAREN, "Expect ')' after compiler_expression.");
+	consume(vm, RIGHT_PAREN, "Expect ')' after compiler_expression.");
 }
 
 fn void unary(Vm* vm, bool can_assign) {
@@ -242,75 +291,104 @@ fn void unary(Vm* vm, bool can_assign) {
 	parse_precedence(vm, UNARY);
 
 	switch (operator_type) {
-		case BANG: vm.compiler.emit_byte(Op.NOT);
-		case MINUS: vm.compiler.emit_byte(Op.NEGATE);
+		case BANG: emit_byte(vm, Op.NOT);
+		case MINUS: emit_byte(vm, Op.NEGATE);
 		default: return;
 	}
 }
 
 fn void binary(Vm* vm, bool can_assign) {
 	TokenType operator_type = vm.compiler.parser.previous.type;
-	ParseRule* rule         = vm.compiler.get_rule(operator_type);
-	parse_precedence(vm, (Precedence)(rule.precedence.ordinal + 1));
+	ParseRule* rule         = get_rule(operator_type);
+	parse_precedence(vm, (Prec)(rule.precedence.ordinal + 1));
 
 	// c3fmt off
 	switch (operator_type) {
-		case BANG_EQUAL:    vm.compiler.emit_bytes(Op.EQUAL, Op.NOT);
-		case EQUAL_EQUAL:   vm.compiler.emit_byte(Op.EQUAL);
-		case GREATER:       vm.compiler.emit_byte(Op.GREATER);
-		case GREATER_EQUAL: vm.compiler.emit_bytes(Op.LESS, Op.NOT);
-		case LESS:          vm.compiler.emit_byte(Op.LESS);
-		case LESS_EQUAL:    vm.compiler.emit_bytes(Op.GREATER, Op.NOT);
-		case PLUS:          vm.compiler.emit_byte(Op.ADD);
-		case MINUS:         vm.compiler.emit_byte(Op.SUBTRACT);
-		case STAR:          vm.compiler.emit_byte(Op.MULTIPLY);
-		case SLASH:         vm.compiler.emit_byte(Op.DIVIDE);
+		case BANG_EQUAL:    emit_bytes(vm, Op.EQUAL, Op.NOT);
+		case EQUAL_EQUAL:   emit_byte(vm, Op.EQUAL);
+		case GREATER:       emit_byte(vm, Op.GREATER);
+		case GREATER_EQUAL: emit_bytes(vm, Op.LESS, Op.NOT);
+		case LESS:          emit_byte(vm, Op.LESS);
+		case LESS_EQUAL:    emit_bytes(vm, Op.GREATER, Op.NOT);
+		case PLUS:          emit_byte(vm, Op.ADD);
+		case MINUS:         emit_byte(vm, Op.SUBTRACT);
+		case STAR:          emit_byte(vm, Op.MULTIPLY);
+		case SLASH:         emit_byte(vm, Op.DIVIDE);
 		default:            return;
 	}
 	// c3fmt on
 }
 
-fn void Compiler.emit_constant(Compiler* compiler, Value value) {
-	compiler.emit_bytes(Op.CONSTANT, compiler.make_constant(value));
+fn void emit_constant(Vm* vm, Value value) {
+	emit_bytes(vm, Op.CONSTANT, make_constant(vm, value));
+}
+
+fn void patch_jump(Vm* vm, sz offset) {
+	sz jump = vm.chunk.count() - offset - 2;
+
+	if (jump > UINT16_MAX) {
+		error(vm, "Too much code to jump over.");
+	}
+
+	vm.chunk.code[offset] = (Uint8)((jump >> 8) & 0xff);
+	vm.chunk.code[offset + 1] = (Uint8)(jump & 0xff);
 }
 
 fn void number(Vm* vm, bool can_assign) {
 	double val = vm.compiler.parser.previous.lexeme.to_double()!!;
-	vm.compiler.emit_constant(number_val(val));
+	emit_constant(vm, number_val(val));
+}
+
+fn void and_(Vm* vm, bool can_assign) {
+	sz end_jump = emit_jump(vm, Op.JUMP_IF_FALSE);
+
+	emit_byte(vm, Op.POP);
+	parse_precedence(vm, AND);
+
+	patch_jump(vm, end_jump);
+}
+
+fn void or_(Vm* vm, bool can_assign) {
+	sz end_jump = emit_jump(vm,Op.JUMP_IF_TRUE);
+
+	emit_byte(vm, Op.POP);
+	parse_precedence(vm, OR);
+
+	patch_jump(vm, end_jump);
 }
 
 fn void string(Vm* vm, bool can_assign) {
 	String inner = vm.compiler.parser.previous.lexeme[1..^2];
 	Obj* c       = vm.allocate_string(inner);
-	vm.compiler.emit_constant(obj_val(c));
+	emit_constant(vm, obj_val(c));
 }
 
 fn void literal(Vm* vm, bool can_assign) {
 	switch (vm.compiler.parser.previous.type) {
-		case FALSE: vm.compiler.emit_byte(Op.FALSE); break;
-		case NIL: vm.compiler.emit_byte(Op.NIL); break;
-		case TRUE: vm.compiler.emit_byte(Op.TRUE); break;
+		case FALSE: emit_byte(vm, Op.FALSE); break;
+		case NIL:  emit_byte(vm, Op.NIL); break;
+		case TRUE: emit_byte(vm, Op.TRUE); break;
 		default: return;  // Unreachable.
 	}
 }
 
-fn void Compiler.end(Compiler* compiler) {
-	compiler.emit_return();
+fn void end(Vm* vm) {
+	emit_return(vm);
 	$if $feat(DEBUG_PRINT_CODE):
-		if (!compiler.parser.had_error) compiler.chunk.disassemble_chunk("code");
+		if (!vm.compiler.parser.had_error) vm.chunk.disassemble_chunk("code");
 	$endif
 }
 
-fn void Compiler.begin_scope(Compiler* compiler) {
-	compiler.scope_depth++;
+fn void begin_scope(Vm* vm) {
+	vm.compiler.scope_depth++;
 }
 
-fn void Compiler.end_scope(Compiler* compiler) {
-	compiler.scope_depth--;
-	while (compiler.locals_count > 0
-		&& compiler.locals[compiler.locals_count - 1].depth > compiler.scope_depth) {
-		compiler.emit_byte(Op.POP);
-		compiler.locals_count--;
+fn void end_scope(Vm* vm) {
+	vm.compiler.scope_depth--;
+	while (vm.compiler.locals_count > 0
+		&& vm.compiler.locals[vm.compiler.locals_count - 1].depth > vm.compiler.scope_depth) {
+		emit_byte(vm, Op.POP);
+		vm.compiler.locals_count--;
 	}
 }
 
@@ -319,12 +397,12 @@ fn bool identifiers_equal(LoxToken* a, LoxToken* b) {
 	return (a.lexeme == b.lexeme);
 }
 
-fn sz Compiler.resolve_local(Compiler* compiler, LoxToken* name) {
-	for (sz i = compiler.locals_count - 1; i >= 0; i--) {
-		Local* local = &compiler.locals[i];
+fn sz resolve_local(Vm* vm, LoxToken* name) {
+	for (sz i = vm.compiler.locals_count - 1; i >= 0; i--) {
+		Local* local = &vm.compiler.locals[i];
 		if (identifiers_equal(name, &local.name)) {
 			if (local.depth == -1) {
-				compiler.error("Can't read local variable in its own initializer.");
+				error(vm, "Can't read local variable in its own initializer.");
 			}
 		}
 		return i;
@@ -332,73 +410,155 @@ fn sz Compiler.resolve_local(Compiler* compiler, LoxToken* name) {
 	return -1;
 }
 
-fn void Compiler.add_local(Compiler* compiler, LoxToken name) {
-	if (compiler.locals_count == UINT8_COUNT) {
-		compiler.error("Too man local variables in functions");
+fn void add_local(Vm* vm, LoxToken name) {
+	if (vm.compiler.locals_count == UINT8_COUNT) {
+		error(vm, "Too man local variables in functions");
 		return;
 	}
-	Local* local = &compiler.locals[compiler.locals_count++];
+	Local* local = &vm.compiler.locals[vm.compiler.locals_count++];
 	local.name = name;
 	local.depth = -1;
 }
 
-fn void Compiler.mark_initialized(Compiler* compiler) {
-	compiler.locals[compiler.locals_count - 1].depth = compiler.scope_depth;
+fn void mark_initialized(Vm* vm) {
+	vm.compiler.locals[vm.compiler.locals_count - 1].depth = vm.compiler.scope_depth;
 }
 
-fn void Compiler.define_variable(Compiler* compiler, Uint8 global) {
-	if (compiler.scope_depth > 0) {
-		compiler.mark_initialized();
+fn void define_variable(Vm* vm, Uint8 global) {
+	if (vm.compiler.scope_depth > 0) {
+		mark_initialized(vm);
 		return;
 	}
-	compiler.emit_bytes(Op.DEFINE_GLOBAL, global);
+	emit_bytes(vm, Op.DEFINE_GLOBAL, global);
 }
 
 fn void expression_statement(Vm* vm) {
 	expression(vm);
-	vm.compiler.consume(SEMICOLON, "Expect ';' after expression.");
-	vm.compiler.emit_byte(Op.POP);
+	consume(vm, SEMICOLON, "Expect ';' after expression.");
+	emit_byte(vm, Op.POP);
+}
+
+fn void for_statement(Vm* vm) {
+	begin_scope(vm);
+	consume(vm, LEFT_PAREN, "Expect '(' after 'for'.");
+	if (match(vm, SEMICOLON)) {
+		// no initializer
+	} else if (match(vm, VAR)) {
+		var_declaration(vm);
+	} else {
+		expression_statement(vm);
+	}
+
+	sz loop_start = vm.chunk.count();
+	sz exit_jump = -1;
+	if (!match(vm, SEMICOLON)) {
+      expression(vm);
+      consume(vm, SEMICOLON, "Expect ';' after loop condition.");
+  
+      exit_jump = emit_jump(vm, Op.JUMP_IF_FALSE);
+      emit_byte(vm, Op.POP); // Condition.
+  }	
+
+  if (!match(vm, RIGHT_PAREN)) {
+      sz body_jump = emit_jump(vm, Op.JUMP);
+      sz increment_start = vm.chunk.count();
+      expression(vm);
+      emit_byte(vm, Op.POP);
+      consume(vm, RIGHT_PAREN, "Expect ')' after for clauses.");
+  
+      emit_loop(vm, loop_start);
+      loop_start = increment_start;
+      patch_jump(vm, body_jump);
+  }
+
+	statement(vm);
+	emit_loop(vm, loop_start);
+
+	if (exit_jump != -1) {
+	  patch_jump(vm, exit_jump);
+		emit_byte(vm, Op.POP);
+	}
+	
+	end_scope(vm);
+}
+
+fn void if_statement(Vm* vm) {
+	consume(vm, LEFT_PAREN, "Expect '(' after 'if',");
+	expression(vm);
+	consume(vm, RIGHT_PAREN, "Expect ')' after condition.");
+
+	sz then_jump = emit_jump(vm, Op.JUMP_IF_FALSE);
+	emit_byte(vm, Op.POP);
+	statement(vm);
+
+	sz else_jump = emit_jump(vm, Op.JUMP);
+	patch_jump(vm, then_jump);
+	emit_byte(vm, Op.POP);
+
+	if (match(vm, ELSE)) statement(vm);
+	patch_jump(vm, else_jump);
 }
 
 fn void print_statement(Vm* vm) {
 	expression(vm);
-	vm.compiler.consume(SEMICOLON, "Expect ';' after value.");
-	vm.compiler.emit_byte(Op.PRINT);
+	consume(vm, SEMICOLON, "Expect ';' after value.");
+	emit_byte(vm, Op.PRINT);
+}
+
+fn void while_statement(Vm* vm) {
+	sz loop_start = vm.chunk.count();
+	consume(vm, LEFT_PAREN, "Expect '(' after 'while'.");
+	expression(vm);
+	consume(vm, RIGHT_PAREN, "Expect ')' after condition.");
+
+	sz exit_jump = emit_jump(vm, Op.JUMP_IF_FALSE);
+	emit_byte(vm, Op.POP);
+	statement(vm);
+	emit_loop(vm, loop_start);
+
+	patch_jump(vm, exit_jump);
+	emit_byte(vm, Op.POP);
 }
 
 fn void statement(Vm* vm) {
-	if (vm.compiler.match(PRINT)) {
+	if (match(vm, PRINT)) {
 		print_statement(vm);
-	} else if (vm.compiler.match(LEFT_BRACE)) {
-		vm.compiler.begin_scope();
+	} else if (match(vm, FOR)) {
+		for_statement(vm);
+	} else if (match(vm, IF)) {
+		if_statement(vm);
+	} else if (match(vm, WHILE)) {
+		while_statement(vm);
+	} else if (match(vm, LEFT_BRACE)) {
+		begin_scope(vm, );
 		block(vm);
-		vm.compiler.end_scope();
+		end_scope(vm);
 	} else {
 		expression_statement(vm);
 	}
 }
 
-fn void Compiler.declare_variable(Compiler* compiler) {
-	if (compiler.scope_depth == 0) return;
+fn void declare_variable(Vm* vm) {
+	if (vm.compiler.scope_depth == 0) return;
 
-	LoxToken* name = &compiler.parser.previous;
-	for (sz i = compiler.locals_count - 1; i >= 0; i--) {
-		Local* local = &compiler.locals[i];
-		if (local.depth != -1 && local.depth < compiler.scope_depth) {
+	LoxToken* name = &vm.compiler.parser.previous;
+	for (sz i = vm.compiler.locals_count - 1; i >= 0; i--) {
+		Local* local = &vm.compiler.locals[i];
+		if (local.depth != -1 && local.depth < vm.compiler.scope_depth) {
 			break;
 		}
 
 		if (identifiers_equal(name, &local.name)) {
-			compiler.error("Already a variable with this name in this scope.");
+			error(vm, "Already a variable with this name in this scope.");
 		}
 	}
-	compiler.add_local(*name);
+	add_local(vm, *name);
 }
 
 fn Uint8 parse_variable(Vm* vm, String error_message) {
-	vm.compiler.consume(IDENTIFIER, error_message);
+	consume(vm, IDENTIFIER, error_message);
 
-	vm.compiler.declare_variable();
+	declare_variable(vm);
 	if (vm.compiler.scope_depth > 0) return 0;
 
 	return identifier_constant(vm, &vm.compiler.parser.previous);
@@ -407,38 +567,40 @@ fn Uint8 parse_variable(Vm* vm, String error_message) {
 fn void var_declaration(Vm* vm) {
 	Uint8 global = parse_variable(vm, "Expect variable name.");
 
-	if (vm.compiler.match(EQUAL)) {
+	if (match(vm, EQUAL)) {
 		expression(vm);
 	} else {
-		vm.compiler.emit_byte(Op.NIL);
+		emit_byte(vm, Op.NIL);
 	}
-	vm.compiler.consume(SEMICOLON, "Expect ';' after variable declaration.");
-	vm.compiler.define_variable(global);
+	consume(vm, SEMICOLON, "Expect ';' after variable declaration.");
+	define_variable(vm, global);
 }
 
 fn void declaration(Vm* vm) {
-	if (vm.compiler.match(VAR)) {
+	if (match(vm, VAR)) {
 		var_declaration(vm);
 	} else {
 		statement(vm);
 	}
-	if (vm.compiler.parser.panic_mode) vm.compiler.synchronize();
+	if (vm.compiler.parser.panic_mode) synchronize(
+		vm,
+	);
 }
 
 fn void block(Vm* vm) {
-	while (!vm.compiler.check(RIGHT_BRACE) && !vm.compiler.check(EOF)) {
+	while (!check(vm, RIGHT_BRACE) && !check(vm, EOF)) {
 		declaration(vm);
 	}
 
-	vm.compiler.consume(RIGHT_BRACE, "Expect '} after block");
+	consume(vm, RIGHT_BRACE, "Expect '} after block");
 }
 
-fn void Compiler.synchronize(Compiler* compiler) {
-	compiler.parser.panic_mode = false;
+fn void synchronize(Vm* vm) {
+	vm.compiler.parser.panic_mode = false;
 
-	while (compiler.parser.current.type != EOF) {
-		if (compiler.parser.previous.type == SEMICOLON) return;
-		switch (compiler.parser.current.type) {
+	while (vm.compiler.parser.current.type != EOF) {
+		if (vm.compiler.parser.previous.type == SEMICOLON) return;
+		switch (vm.compiler.parser.current.type) {
 			case CLASS:
 			case FUN:
 			case VAR:
@@ -450,21 +612,20 @@ fn void Compiler.synchronize(Compiler* compiler) {
 			default:
 		}
 
-		compiler.advance();
+		advance(vm);
 	}
 }
 fn bool compile(Vm* vm, char[] source, Chunk* new_chunk) {
 	vm.compiler.init(source);
-	vm.compiler.chunk = new_chunk;
+	vm.chunk = new_chunk;
 
 	vm.compiler.parser.had_error = false;
 	vm.compiler.parser.panic_mode = false;
 
-	vm.compiler.advance();
-	while (!vm.compiler.match(EOF)) {
+	advance(vm);
+	while (!match(vm, EOF)) {
 		declaration(vm);
 	}
-	vm.compiler.end();
+	end(vm);
 	return !vm.compiler.parser.had_error;
 }
-

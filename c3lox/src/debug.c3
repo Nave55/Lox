@@ -5,7 +5,7 @@ import std::io;
 fn void Chunk.disassemble_chunk(Chunk* chunk, String name) {
 	io::printf("== %s ==\n", name);
 
-	for (sz offset = 0; offset < chunk.code.size;) {
+	for (sz offset = 0; offset < chunk.code.len();) {
 		offset = chunk.disassemble_instruction(offset);
 	}
 }
@@ -41,6 +41,10 @@ fn sz Chunk.disassemble_instruction(Chunk* chunk, sz offset) {
 		case Op.NOT:           return simple_instruction("NOT", offset);
 		case Op.NEGATE:        return simple_instruction("NEGATE", offset);
 		case Op.PRINT:         return simple_instruction("PRINT", offset);
+		case Op.JUMP:          return jump_instruction("JUMP", 1, chunk, offset);
+		case Op.JUMP_IF_FALSE: return jump_instruction("JUMP_IF_FALSE", 1, chunk, offset);
+		case Op.JUMP_IF_TRUE:  return jump_instruction("JUMP_IF_TRUE", 1, chunk, offset);
+		case Op.LOOP:          return jump_instruction("LOOP", -1, chunk, offset);
 		case Op.RETURN:        return simple_instruction("RETURN", offset);
 		default:
 			io::printf("Unknown opcode %s\n", instruction);
@@ -58,6 +62,13 @@ fn sz byte_instruction(String name, Chunk* chunk, sz offset) {
 	Uint8 slot = chunk.code[offset + 1];
 	io::printfn("%-16s %4d", name, slot);
 	return offset + 2;
+}
+
+fn sz jump_instruction(String name, sz sign, Chunk* chunk, sz offset) {
+	Uint16 jump = (Uint16)(chunk.code[offset + 1] << 8);
+	jump |= chunk.code[offset + 2];
+	io::printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
+	return offset + 3;
 }
 
 fn sz constant_instruction(String name, Chunk* chunk, sz offset) {
