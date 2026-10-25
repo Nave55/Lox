@@ -13,7 +13,7 @@ Implementation of Lox from the book **Crafting Interpreters**
 - ✅ hlox
 - ❌ c3lox 
 
-- Currently working on **Chapter 23**
+- Currently working on **Chapter 24**
 
 ## hlox (Haskell jLox)
 
