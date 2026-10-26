@@ -59,6 +59,8 @@ const ParseRule*[*] RULE = {
 	[TokenType.OR]            = &&{ null,      &or_,    Prec.OR },
 	[TokenType.PRINT]         = &&{ null,      null,    Prec.NONE },
 	[TokenType.RETURN]        = &&{ null,      null,    Prec.NONE },
+	[TokenType.BREAK]         = &&{ null,      null,    Prec.NONE },
+	[TokenType.CONTINUE]      = &&{ null,      null,    Prec.NONE },
 	[TokenType.SUPER]         = &&{ null,      null,    Prec.NONE },
 	[TokenType.THIS]          = &&{ null,      null,    Prec.NONE },
 	[TokenType.TRUE]          = &&{ &literal,  null,    Prec.NONE },
@@ -81,6 +83,14 @@ struct Local {
 	sz depth;
 }
 
+struct Loop {
+	sz[MAX_BREAKS] break_jumps;
+	sz break_count;
+	sz continue_target;
+	sz scope_depth;
+	Loop* enclosing;
+}
+
 struct Compiler {
 	Local[UINT8_COUNT] locals;
 	HashMap{String, Uint8} global_map;
@@ -89,12 +99,14 @@ struct Compiler {
 
 	LoxScanner scanner;
 	Parser parser;
+	Loop* current_loop;
 }
 
 fn void Compiler.init(Compiler* compiler, char[] source) {
 	compiler.scanner.init(source);
 	compiler.locals_count = 0;
 	compiler.scope_depth = 0;
+	compiler.current_loop = null;
 }
 
 fn void error_at(Vm* vm, LoxToken* token, String message) {
@@ -424,48 +436,10 @@ fn void expression_statement(Vm* vm) {
 	emit_byte(vm, Op.POP);
 }
 
-fn void for_statement(Vm* vm) {
-	begin_scope(vm);
-	consume(vm, LEFT_PAREN, "Expect '(' after 'for'.");
-	if (match(vm, SEMICOLON)) {
-		// no initializer
-	} else if (match(vm, VAR)) {
-		var_declaration(vm);
-	} else {
-		expression_statement(vm);
-	}
-
-	sz loop_start =  vm.chunk.count();
-	sz exit_jump  = -1;
-	if (!match(vm, SEMICOLON)) {
-		expression(vm);
-		consume(vm, SEMICOLON, "Expect ';' after loop condition.");
-
-		exit_jump = emit_jump(vm, Op.JUMP_IF_FALSE);
-		emit_byte(vm, Op.POP); // Condition.
-	}
-
-	if (!match(vm, RIGHT_PAREN)) {
-		sz body_jump       = emit_jump(vm, Op.JUMP);
-		sz increment_start = vm.chunk.count();
-		expression(vm);
-		emit_byte(vm, Op.POP);
-		consume(vm, RIGHT_PAREN, "Expect ')' after for clauses.");
-
-		emit_loop(vm, loop_start);
-		loop_start = increment_start;
-		patch_jump(vm, body_jump);
-	}
-
-	statement(vm);
-	emit_loop(vm, loop_start);
-
-	if (exit_jump != -1) {
-		patch_jump(vm, exit_jump);
-		emit_byte(vm, Op.POP);
-	}
-
-	end_scope(vm);
+fn void print_statement(Vm* vm) {
+	expression(vm);
+	consume(vm, SEMICOLON, "Expect ';' after value.");
+	emit_byte(vm, Op.PRINT);
 }
 
 fn void if_statement(Vm* vm) {
@@ -485,30 +459,162 @@ fn void if_statement(Vm* vm) {
 	patch_jump(vm, else_jump);
 }
 
-fn void print_statement(Vm* vm) {
-	expression(vm);
-	consume(vm, SEMICOLON, "Expect ';' after value.");
-	emit_byte(vm, Op.PRINT);
+fn void continue_statement(Vm* vm) {
+	if (vm.compiler.current_loop == null) {
+		error(vm, "Can't use 'continue' outside of a loop.");
+		return;
+	}
+
+	consume(vm, SEMICOLON, "Expect ';' after 'continue'.");
+
+	Loop* loop = vm.compiler.current_loop;
+
+	for (sz i = vm.compiler.locals_count; i > 0; i--) {
+		Local* local = &vm.compiler.locals[i - 1];
+		if (local.depth <= loop.scope_depth) break;
+		emit_byte(vm, Op.POP);
+	}
+
+	emit_loop(vm, loop.continue_target);
+}
+
+fn void break_statement(Vm* vm) {
+	if (vm.compiler.current_loop == null) {
+		error(vm, "Can't use 'break' outside of a loop.");
+		return;
+	}
+
+	consume(vm, SEMICOLON, "Expect ';' after 'break'.");
+
+	Loop* loop = vm.compiler.current_loop;
+
+	if (loop.break_count == MAX_BREAKS) {
+		error(vm, "Too many break statements in loop.");
+		return;
+	}
+
+	for (sz i = vm.compiler.locals_count; i > 0; i--) {
+		Local* local = &vm.compiler.locals[i - 1];
+		if (local.depth <= loop.scope_depth) break;
+		emit_byte(vm, Op.POP);
+	}
+
+	sz jump = emit_jump(vm, Op.JUMP);
+
+	loop.break_jumps[loop.break_count++] = jump;
+}
+
+fn void for_statement(Vm* vm) {
+	begin_scope(vm);
+
+	consume(vm, LEFT_PAREN, "Expect '(' after 'for'.");
+
+	if (match(vm, SEMICOLON)) {
+		// No initializer.
+	} else if (match(vm, VAR)) {
+		var_declaration(vm);
+	} else {
+		expression_statement(vm);
+	}
+
+	sz loop_start =  vm.chunk.count();
+	sz exit_jump  = -1;
+
+	if (!match(vm, SEMICOLON)) {
+		expression(vm);
+		consume(vm, SEMICOLON, "Expect ';' after loop condition.");
+
+		exit_jump = emit_jump(vm, Op.JUMP_IF_FALSE);
+		emit_byte(vm, Op.POP);
+	}
+
+	sz continue_target = loop_start;
+
+	if (!match(vm, RIGHT_PAREN)) {
+		sz body_jump = emit_jump(vm, Op.JUMP);
+
+		sz increment_start = vm.chunk.count();
+		continue_target = increment_start;
+
+		expression(vm);
+		emit_byte(vm, Op.POP);
+
+		consume(vm, RIGHT_PAREN, "Expect ')' after for clauses.");
+
+		emit_loop(vm, loop_start);
+
+		loop_start = increment_start;
+
+		patch_jump(vm, body_jump);
+	}
+
+	Loop loop = {
+		.continue_target = continue_target,
+		.break_count = 0,
+		.scope_depth = vm.compiler.scope_depth,
+		.enclosing = vm.compiler.current_loop,
+	};
+
+	vm.compiler.current_loop = &loop;
+
+	statement(vm);
+
+	emit_loop(vm, loop_start);
+
+	if (exit_jump != -1) {
+		patch_jump(vm, exit_jump);
+		emit_byte(vm, Op.POP);
+	}
+
+	for (sz i = 0; i < loop.break_count; i++) {
+		patch_jump(vm, loop.break_jumps[i]);
+	}
+
+	end_scope(vm);
+
+	vm.compiler.current_loop = loop.enclosing;
 }
 
 fn void while_statement(Vm* vm) {
 	sz loop_start = vm.chunk.count();
+
+	Loop loop = {
+		.continue_target = loop_start,
+		.break_count = 0,
+		.scope_depth = vm.compiler.scope_depth,
+		.enclosing = vm.compiler.current_loop,
+	};
+
+	vm.compiler.current_loop = &loop;
+
 	consume(vm, LEFT_PAREN, "Expect '(' after 'while'.");
 	expression(vm);
 	consume(vm, RIGHT_PAREN, "Expect ')' after condition.");
 
 	sz exit_jump = emit_jump(vm, Op.JUMP_IF_FALSE);
 	emit_byte(vm, Op.POP);
+
 	statement(vm);
+
 	emit_loop(vm, loop_start);
 
 	patch_jump(vm, exit_jump);
 	emit_byte(vm, Op.POP);
+
+	for (sz i = 0; i < loop.break_count; i++) {
+		patch_jump(vm, loop.break_jumps[i]);
+	}
+	
+	vm.compiler.current_loop = loop.enclosing;
 }
 
 fn void statement(Vm* vm) {
 	if (match(vm, PRINT)) {
 		print_statement(vm);
+	} else if (match(vm, BREAK)) {
+		break_statement(vm);
+	} else if (match(vm, CONTINUE)) {
+		continue_statement(vm);
 	} else if (match(vm, FOR)) {
 		for_statement(vm);
 	} else if (match(vm, IF)) {

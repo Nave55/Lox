@@ -19,9 +19,10 @@ enum TokenType : char {
 
 	// Keywords
 	AND,  CLASS, ELSE,   FALSE,
-	FOR,  FUN,   IF,     NIL,
-	OR,   PRINT, RETURN, SUPER,
+	FOR,  FUN,   IF,     CONTINUE,
+	OR,   PRINT, RETURN, BREAK,
 	THIS, TRUE,  VAR,    WHILE,
+	NIL,  SUPER, 
 
 	ERROR, EOF,
 }
@@ -142,7 +143,16 @@ fn TokenType LoxScanner.check_keyword(
 fn TokenType LoxScanner.identifier_type(LoxScanner* scanner) {
 	switch (scanner.source[scanner.start]) {
 		case 'a': return scanner.check_keyword(1, 2, "nd", AND);
-		case 'c': return scanner.check_keyword(1, 4, "lass", CLASS);
+		case 'b': return scanner.check_keyword(1, 4, "reak", BREAK);
+
+		case 'c':
+			if (scanner.current - scanner.start > 1) {
+				switch (scanner.source[scanner.start + 1]) {
+					case 'l': return scanner.check_keyword(2, 3, "ass", CLASS);
+					case 'o': return scanner.check_keyword(2, 6, "ntinue", CONTINUE);
+				}
+			}
+
 		case 'e': return scanner.check_keyword(1, 3, "lse", ELSE);
 
 		case 'f':
