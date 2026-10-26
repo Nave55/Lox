@@ -181,7 +181,7 @@ fn void? Vm.run(Vm* vm) {
 
 fn void? Vm.interpret(Vm* vm, char[] source) {
 	vm.reset();
-	if (!compile(vm, source, &vm.chunk)) return COMPILE_ERROR~;
+	if (!compile(vm, source)) return COMPILE_ERROR~;
 	return vm.run();
 }
 

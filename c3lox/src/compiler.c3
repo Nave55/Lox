@@ -706,9 +706,8 @@ fn void synchronize(Vm* vm) {
 		advance(vm);
 	}
 }
-fn bool compile(Vm* vm, char[] source, Chunk* new_chunk) {
+fn bool compile(Vm* vm, char[] source) {
 	vm.compiler.init(source);
-	vm.chunk = *new_chunk;
 
 	vm.compiler.parser.had_error = false;
 	vm.compiler.parser.panic_mode = false;
