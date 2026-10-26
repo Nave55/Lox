@@ -11,18 +11,17 @@ struct Vm {
 	List{Obj*} objects;
 	HashMap{String, Value} globals;
 	Compiler compiler;
-	Chunk* chunk;
+	Chunk chunk;
 	sz ip;
 	sz stack_top;
 }
 
 // allocations
 fn void Vm.init(Vm* vm) {
-	vm.compiler.global_map.tinit(16);
-	vm.reset_stack();
+	vm.chunk.init();
 	vm.objects.tinit(32);
 	vm.globals.tinit(16);
-	vm.chunk = null;
+	vm.compiler.global_map.tinit(16);
 	vm.ip = 0;
 	vm.stack_top = 0;
 }
@@ -34,9 +33,7 @@ fn void Vm.reset_stack(Vm* vm) {
 
 fn void Vm.reset(Vm* vm) {
 	vm.reset_stack();
-	vm.globals.clear();
-	vm.objects.clear();
-	vm.chunk = null;
+	vm.chunk.clear();
 }
 
 fn void Vm.runtime_error(Vm* vm, String format, args...) {
@@ -183,17 +180,8 @@ fn void? Vm.run(Vm* vm) {
 }
 
 fn void? Vm.interpret(Vm* vm, char[] source) {
-	vm.reset_stack();
-	Chunk chunk;
-	chunk.init(); // allocation
-	vm.chunk = &chunk;
-
-	if (!compile(vm, source, &chunk)) return COMPILE_ERROR~;
-
-	// fault err = @catch(vm_run());
-	// free_vm();
-	// return err~;
-
+	vm.reset();
+	if (!compile(vm, source, &vm.chunk)) return COMPILE_ERROR~;
 	return vm.run();
 }
 

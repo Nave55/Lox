@@ -107,6 +107,7 @@ fn void Compiler.init(Compiler* compiler, char[] source) {
 	compiler.locals_count = 0;
 	compiler.scope_depth = 0;
 	compiler.current_loop = null;
+	compiler.global_map.clear();
 }
 
 fn void error_at(Vm* vm, LoxToken* token, String message) {
@@ -707,7 +708,7 @@ fn void synchronize(Vm* vm) {
 }
 fn bool compile(Vm* vm, char[] source, Chunk* new_chunk) {
 	vm.compiler.init(source);
-	vm.chunk = new_chunk;
+	vm.chunk = *new_chunk;
 
 	vm.compiler.parser.had_error = false;
 	vm.compiler.parser.panic_mode = false;

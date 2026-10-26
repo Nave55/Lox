@@ -44,6 +44,12 @@ fn void Chunk.init(Chunk* chunk) {
 	chunk.constants.tinit(32);
 }
 
+fn void Chunk.clear(Chunk* chunk) {
+	chunk.code.clear();
+	chunk.lines.clear();
+	chunk.constants.clear();
+}
+
 fn void Chunk.write(Chunk* chunk, Uint8 byte, sz line) {
 	chunk.code.push(byte);
 	chunk.lines.push(line);
