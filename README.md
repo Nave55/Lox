@@ -40,4 +40,5 @@ Optional defines are `DEBUG_TRACE_EXECUTION` and `DEBUG_PRINT_CODE` that can be 
 - Going to avoid using pointer arithmetic and data structures like linked lists
 - Data Structures that don't need to be gc will be allocated using temp allocator and cleaned up after interpreter leaves scope
 - Skipped chapter 20 since I'm using `DString` and not `char*` for obj strings
+- Added `%` operator, `+=` operator and `continue`, `break` keywords
 
