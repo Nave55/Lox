@@ -70,6 +70,7 @@ macro binary_fn(a, b, $op) {
 		$case '-': return a - b;
 		$case '*': return a * b;
 		$case '/': return a / b;
+		$case '%': return a % b;
 		$case '>': return a > b;
 		$case '<': return a < b;
 	$endswitch
@@ -152,6 +153,7 @@ fn void? Vm.run(Vm* vm) {
 			case Op.SUBTRACT: @binary_op(vm, number_val, '-')!;
 			case Op.MULTIPLY: @binary_op(vm, number_val, '*')!;
 			case Op.DIVIDE: @binary_op(vm, number_val, '/')!;
+			case Op.MODULO: @binary_op(vm, number_val, '%')!;
 			case Op.NOT: vm.push(bool_val(is_falsey(vm.pop())));
 			case Op.NEGATE:
 				if (!is_num(vm.peek(0))) {

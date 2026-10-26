@@ -20,6 +20,7 @@ constset Op : inline Uint8 {
 	SUBTRACT,
 	MULTIPLY,
 	DIVIDE,
+	MODULO,
 	NOT,
 	NEGATE,
 	PRINT,

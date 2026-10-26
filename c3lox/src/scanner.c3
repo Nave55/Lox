@@ -7,7 +7,7 @@ enum TokenType : char {
 	// Single-character tokens.
 	LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, RIGHT_BRACE,
 	COMMA,      DOT,         MINUS,      PLUS,
-	SEMICOLON,  SLASH,       STAR,
+	SEMICOLON,  SLASH,       STAR,       PERCENT,
 
 	// One or two character tokens
 	BANG,       BANG_EQUAL,    EQUAL,      EQUAL_EQUAL,
@@ -231,6 +231,7 @@ fn LoxToken LoxScanner.scan_token(LoxScanner* scanner) {
 		case ';': return scanner.make_token(SEMICOLON);
 		case ',': return scanner.make_token(COMMA);
 		case '.': return scanner.make_token(DOT);
+		case '%': return scanner.make_token(PERCENT);
 		case '-': return scanner.make_token(scanner.match('=') ? MINUS_EQUAL : MINUS);
 		case '+': return scanner.make_token(scanner.match('=') ? PLUS_EQUAL : PLUS);
 		case '*': return scanner.make_token(scanner.match('=') ? STAR_EQUAL : STAR);

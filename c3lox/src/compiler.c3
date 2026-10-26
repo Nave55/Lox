@@ -36,6 +36,7 @@ const ParseRule*[*] RULE = {
 	[TokenType.SEMICOLON]     = &&{ null,      null,    Prec.NONE },
 	[TokenType.SLASH]         = &&{ null,      &binary, Prec.FACTOR },
 	[TokenType.STAR]          = &&{ null,      &binary, Prec.FACTOR },
+	[TokenType.PERCENT]       = &&{ null,      &binary, Prec.FACTOR },
 	[TokenType.BANG]          = &&{ &unary,    null,    Prec.NONE },
 	[TokenType.BANG_EQUAL]    = &&{ null,      &binary, Prec.EQUALITY },
 	[TokenType.EQUAL]         = &&{ null,      null,    Prec.NONE },
@@ -302,6 +303,7 @@ fn void binary(Vm* vm, bool can_assign) {
 		case MINUS:         emit_byte(vm, Op.SUBTRACT);
 		case STAR:          emit_byte(vm, Op.MULTIPLY);
 		case SLASH:         emit_byte(vm, Op.DIVIDE);
+		case PERCENT:       emit_byte(vm, Op.MODULO);
 		default:            return;
 	}
 	// c3fmt on

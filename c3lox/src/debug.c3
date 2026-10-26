@@ -38,6 +38,7 @@ fn sz Chunk.disassemble_instruction(Chunk* chunk, sz offset) {
 		case Op.SUBTRACT:      return simple_instruction("SUBTRACT", offset);
 		case Op.MULTIPLY:      return simple_instruction("MULTIPLY", offset);
 		case Op.DIVIDE:        return simple_instruction("DIVIDE", offset);
+		case Op.MODULO:        return simple_instruction("MODULO", offset);
 		case Op.NOT:           return simple_instruction("NOT", offset);
 		case Op.NEGATE:        return simple_instruction("NEGATE", offset);
 		case Op.PRINT:         return simple_instruction("PRINT", offset);
