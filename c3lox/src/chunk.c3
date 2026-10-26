@@ -41,7 +41,7 @@ struct Chunk {
 fn void Chunk.init(Chunk* chunk) {
 	chunk.code.tinit(32);
 	chunk.lines.tinit(16);
-	chunk.constants.tinit(32);
+	chunk.constants.tinit(16);
 }
 
 fn void Chunk.clear(Chunk* chunk) {

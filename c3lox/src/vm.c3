@@ -18,12 +18,10 @@ struct Vm {
 
 // allocations
 fn void Vm.init(Vm* vm) {
+  vm.compiler.init();
 	vm.chunk.init();
-	vm.objects.tinit(32);
+	vm.objects.tinit(16);
 	vm.globals.tinit(16);
-	vm.compiler.global_map.tinit(16);
-	vm.ip = 0;
-	vm.stack_top = 0;
 }
 
 fn void Vm.reset_stack(Vm* vm) {
@@ -45,12 +43,7 @@ fn void Vm.runtime_error(Vm* vm, String format, args...) {
 	vm.reset_stack();
 }
 
-fn Uint8 Vm.read_byte(Vm* vm) {
-	Uint8 byte = vm.chunk.code[vm.ip];
-	vm.ip++;
-	return byte;
-}
-
+macro Uint8 Vm.read_byte(Vm* vm) => vm.chunk.code[vm.ip++];
 macro Value Vm.read_constant(Vm* vm) => vm.chunk.constants[vm.read_byte()];
 macro DString Vm.read_dstring(Vm* vm) => as_string(vm.read_constant());
 macro String Vm.read_ident(Vm* vm) => as_ident(vm.read_constant());
@@ -185,15 +178,8 @@ fn void? Vm.interpret(Vm* vm, char[] source) {
 	return vm.run();
 }
 
-fn void Vm.push(Vm* vm, Value value) {
-	vm.stack[vm.stack_top] = value;
-	vm.stack_top++;
-}
-
-fn Value Vm.pop(Vm* vm) {
-	vm.stack_top--;
-	return vm.stack[vm.stack_top];
-}
+fn void Vm.push(Vm* vm, Value value) => vm.stack[vm.stack_top++] = value;
+fn Value Vm.pop(Vm* vm) => vm.stack[--vm.stack_top];
 
 fn Value Vm.peek(Vm* vm, sz distance) => vm.stack[vm.stack_top - distance - 1];
 fn bool is_falsey(Value value) => is_nil(value) || (is_bool(value) && !as_bool(value));
