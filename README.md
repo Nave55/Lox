@@ -18,7 +18,7 @@ Implementation of Lox from the book **Crafting Interpreters**
 ## hlox (Haskell jLox)
 
 A pure, persistent-structure implementation of jLox. \
-To run type `cabal run Hlox -- "file.lox` with the file path being optional.
+To run type `cabal run Hlox -- "file.lox"` with the file path being optional.
 
 ### Notes
 - I am **Not** an expert haskell developer so there are probably lots of mistakes and non idiomatic code 
