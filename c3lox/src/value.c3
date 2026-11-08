@@ -1,10 +1,7 @@
 module c3lox;
 
 import std::collections::list;
-import std::io;
 import std::math;
-
-excuse TAG_MISMATCH;
 
 enum ValueType : Uint8 {
 	BOOL,
@@ -33,19 +30,19 @@ fn sz ValueArray.write(ValueArray* array, Value val) {
 	return count;
 }
 
-macro number_val(v) => (Value) { (ValueData) { .as_num = v }, NUMBER };
-macro bool_val(v) => (Value) { (ValueData) { .as_bool = v }, BOOL };
-macro nil_val() => (Value) { (ValueData) { .as_num = 0 }, NIL };
-macro obj_val(v) => (Value) { (ValueData) { .as_obj = v }, OBJ };
+macro Value number_val(v) => (Value) { (ValueData) { .as_num = v }, NUMBER };
+macro Value bool_val(v) => (Value) { (ValueData) { .as_bool = v }, BOOL };
+macro Value nil_val() => (Value) { (ValueData) { .as_num = 0 }, NIL };
+macro Value obj_val(v) => (Value) { (ValueData) { .as_obj = v }, OBJ };
 
-macro is_num(v) => v.tag == NUMBER;
-macro is_bool(v) => v.tag == BOOL;
-macro is_nil(v) => v.tag == NIL;
-macro is_obj(v) => v.tag == OBJ;
+macro bool is_num(v) => v.tag == NUMBER;
+macro bool is_bool(v) => v.tag == BOOL;
+macro bool is_nil(v) => v.tag == NIL;
+macro bool is_obj(v) => v.tag == OBJ;
 
-macro as_num(v) => v.val.as_num;
-macro as_bool(v) => v.val.as_bool;
-macro as_obj(v) => v.val.as_obj;
+macro double as_num(v) => v.val.as_num;
+macro bool as_bool(v) => v.val.as_bool;
+macro Obj* as_obj(v) => v.val.as_obj;
 
 fn bool values_equal(Value a, Value b) {
 	if (a.tag != b.tag) return false;

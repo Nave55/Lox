@@ -38,10 +38,17 @@ struct Chunk {
 }
 
 // ** allocations **
-fn void Chunk.init(Chunk* chunk) {
-	chunk.code.tinit(32);
-	chunk.lines.tinit(16);
-	chunk.constants.tinit(16);
+fn void Chunk.init(Chunk* chunk, Allocator alloc) {
+	chunk.code.init(alloc, 32);
+	chunk.lines.init(alloc, 16);
+	chunk.constants.init(alloc, 16);
+}
+
+// free for chunks allocated using heap allocator
+fn void Chunk.dealloc(Chunk* chunk) {
+	chunk.code.free();
+	chunk.lines.free();
+	chunk.constants.free();
 }
 
 fn void Chunk.clear(Chunk* chunk) {

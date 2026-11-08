@@ -94,16 +94,15 @@ struct Loop {
 struct Compiler {
 	Local[UINT8_COUNT] locals;
 	HashMap{String, Uint8} global_map;
-	sz locals_count;
-	sz scope_depth;
-
 	LoxScanner scanner;
 	Parser parser;
+	sz locals_count;
+	sz scope_depth;
 	Loop* current_loop;
 }
 
-fn void Compiler.init(Compiler* compiler) {
-	compiler.global_map.tinit(16);
+fn void Compiler.init(Compiler* compiler, Allocator alloc) {
+	compiler.global_map.init(alloc, 16);
 }
 
 fn void Compiler.reset(Compiler* compiler, char[] source) {
@@ -609,7 +608,7 @@ fn void while_statement(Vm* vm) {
 	for (sz i = 0; i < loop.break_count; i++) {
 		patch_jump(vm, loop.break_jumps[i]);
 	}
-	
+
 	vm.compiler.current_loop = loop.enclosing;
 }
 

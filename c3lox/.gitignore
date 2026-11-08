@@ -1,6 +1,6 @@
 out/
 build/obj
-resources/*.txt
+resources/*.lox
 .vscode
 .zed
 *.exe

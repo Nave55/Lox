@@ -11,14 +11,14 @@ fn void run_file(String path) => @pool() {
 	}
 
 	Vm vm;
-	vm.init();
+	vm.init(tmem);
 	vm.interpret(con) ?? os::exit(65);
 	vm.free_objects();
 }
 
 fn void repl() => @pool() {
 	Vm vm;
-	vm.init();
+	vm.init(tmem);
 
 	io::printn("-----------------------------------------");
 	io::printn("                 LOX REPL                ");

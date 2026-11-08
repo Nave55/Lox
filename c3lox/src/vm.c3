@@ -4,8 +4,6 @@ import std::io;
 import std::collections::list;
 import std::collections::map;
 
-excuse COMPILE_ERROR, RUNTIME_ERROR;
-
 struct Vm {
 	Value[STACK_MAX] stack;
 	List{Obj*} objects;
@@ -17,11 +15,11 @@ struct Vm {
 }
 
 // allocations
-fn void Vm.init(Vm* vm) {
-  vm.compiler.init();
-	vm.chunk.init();
-	vm.objects.tinit(16);
-	vm.globals.tinit(16);
+fn void Vm.init(Vm* vm, Allocator alloc) {
+	vm.compiler.init(alloc);
+	vm.chunk.init(alloc);
+	vm.objects.init(alloc, 16);
+	vm.globals.init(alloc, 16);
 }
 
 fn void Vm.reset_stack(Vm* vm) {
@@ -48,7 +46,7 @@ macro Value Vm.read_constant(Vm* vm) => vm.chunk.constants[vm.read_byte()];
 macro DString Vm.read_dstring(Vm* vm) => as_string(vm.read_constant());
 macro String Vm.read_ident(Vm* vm) => as_ident(vm.read_constant());
 
-macro read_short(Vm* vm) {
+macro sz read_short(Vm* vm) {
 	vm.ip += 2;
 	return (sz)(vm.chunk.code[vm.ip - 2] << 8 | vm.chunk.code[vm.ip - 1]);
 }
